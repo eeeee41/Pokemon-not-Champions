@@ -197,3 +197,31 @@ test("each player sees only percentages for the opponent's HP", () => {
     }
   }
 });
+
+test('every Mega Stone (and Mega Rayquaza) Mega Evolves in battle', async () => {
+  const {megaOptions, selectableSpecies} = await import('../src/engine/dex.js');
+  const filler = ['Pikachu', 'Eevee', 'Snorlax', 'Lapras', 'Ditto'].map(s => {
+    const m = newMon(s);
+    m.moves = [s === 'Ditto' ? 'Transform' : s === 'Pikachu' ? 'Thunder Shock' : 'Tackle', '', '', ''];
+    return m;
+  });
+  let checked = 0;
+  for (const s of selectableSpecies()) {
+    for (const o of megaOptions(s.name)) {
+      const mon = newMon(s.name);
+      mon.item = o.item || '';
+      mon.moves = [o.move || 'Protect', 'Protect', '', ''].filter((m, i, a) => a.indexOf(m) === i).concat(['', '']).slice(0, 4);
+      const match = new Match({mode: 'singles', seed: [1, 2, 3, 4], players: [
+        {name: 'A', team: {mons: [mon, ...filler]}}, {name: 'B', team: {mons: [...filler, filler[0]]}},
+      ]});
+      match.choose(0, 'team 123456');
+      match.choose(1, 'team 123456');
+      assert.ok(match.requests[0].active[0].canMegaEvo, `${s.name} with ${o.item || o.move}: no Mega option`);
+      assert.ok(match.choose(0, `move ${o.move ? 1 : 1} mega`));
+      match.choose(1, 'move 1');
+      assert.equal(match.battle.sides[0].active[0].species.name, o.mega, `${s.name} → ${o.mega}`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 95, `only ${checked} Megas checked`);
+});

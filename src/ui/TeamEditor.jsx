@@ -1,7 +1,7 @@
 // Editing one team: six slots, and a full editor for the selected Pokémon.
 import {useState} from 'preact/hooks';
 import {
-  dex, natures, speciesAbilities, calcStats, itemGimmick, clampSP,
+  dex, toID, natures, speciesAbilities, calcStats, itemGimmick, clampSP, megaOptions, megaName,
 } from '../engine/dex.js';
 import {canLearn} from '../engine/learnsets.js';
 import {
@@ -23,6 +23,66 @@ function baseColor(v) {
   if (v < 100) return '#d6c21c';
   if (v < 120) return '#5bbf3a';
   return '#1fae9a';
+}
+
+/** Applies a pick like "Mega Charizard X" (base Pokémon + Mega Stone) or "Gigantamax Lapras". */
+function applyExtra(mon, extra) {
+  if (!extra) return mon;
+  const out = {...mon};
+  if (extra.item) out.item = extra.item;
+  if (extra.gmax) out.gmax = true;
+  if (extra.move) {
+    const moves = [...out.moves];
+    while (moves.length < MAX_MOVES) moves.push('');
+    if (!moves.some(m => toID(m) === toID(extra.move))) {
+      const empty = moves.findIndex(m => !m);
+      moves[empty >= 0 ? empty : 0] = extra.move;
+    }
+    out.moves = moves;
+    // A Z-Crystal stops Mega Rayquaza, so make room for it.
+    if (out.item && dex.items.get(out.item).zMove) out.item = '';
+  }
+  return out;
+}
+
+function MegaPicker({mon, onChange}) {
+  const options = megaOptions(mon.species);
+  if (!options.length) return null;
+  const heldItem = mon.item ? dex.items.get(mon.item).name : '';
+  const isOn = o => (o.item ? heldItem === o.item : mon.moves.some(m => toID(m) === toID(o.move)));
+  const anyOn = options.some(isOn);
+  return (
+    <div class="label">
+      <span>Mega Evolution</span>
+      <div class="mega-options" role="group" aria-label="Mega Evolution">
+        {options.map(o => (
+          <button
+            key={o.mega}
+            class="mega-option"
+            aria-pressed={isOn(o)}
+            onClick={() => {
+              if (isOn(o)) {
+                if (o.item) onChange({item: ''});
+                return;
+              }
+              const next = applyExtra(mon, o.item ? {item: o.item} : {move: o.move});
+              onChange({item: next.item, moves: next.moves});
+            }}
+          >
+            <FitSprite name={o.mega} width={56} height={48} />
+            <span style={{minWidth: 0, display: 'grid'}}>
+              <strong>{megaName(o.mega)}</strong>
+              <span class="dim">{o.item ? `Holds ${o.item}` : `Knows ${o.move}`}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <span class="dim" style={{fontWeight: 400, fontSize: '.85rem'}}>
+        {anyOn ? 'Ready. In battle, turn on Mega Evolve before picking a move. One Mega per battle.' :
+          'Tap one to give it the Mega Stone. The Mega Evolve button only shows up in battle when the stone is held.'}
+      </span>
+    </div>
+  );
 }
 
 function GimmickBadges({mon}) {
@@ -123,18 +183,19 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
   const required = requiredItems(species);
   const item = mon.item ? dex.items.get(mon.item) : null;
 
-  const changeSpecies = name => {
+  const changeSpecies = (name, extra) => {
     const fresh = newMon(name);
     const s = dex.species.get(name);
-    const keepItem = mon.item && !requiredItems(s).length ? mon.item : fresh.item;
-    onChange({
+    const keepItem = mon.item && !requiredItems(s).length && !itemGimmick(mon.item, mon.species)?.kind?.startsWith('mega') ?
+      mon.item : fresh.item;
+    onChange(applyExtra({
       ...fresh,
       nickname: '',
       sp: mon.sp,
       nature: mon.nature,
       item: keepItem,
       moves: mon.moves.map(m => (m && canLearn(name, m) ? m : '')),
-    }, true);
+    }, extra), true);
     setPicker(null);
   };
 
@@ -208,6 +269,7 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
             {item && <span class="dim" style={{fontWeight: 400, fontSize: '.85rem'}}>{item.shortDesc || item.desc}</span>}
             {item && takenItems.includes(item.id) && <span style={{color: 'var(--bad)', fontSize: '.85rem'}}>Another Pokémon on this team holds {item.name}.</span>}
           </div>
+          <MegaPicker mon={mon} onChange={onChange} />
           <div class="label">
             <span>Tera Type</span>
             <div class="tera-grid" role="group" aria-label="Tera Type">
@@ -275,8 +337,8 @@ export function TeamEditor({team, onChange, onBack, onBattle}) {
     const mons = team.mons.map((m, j) => (j === i ? (replace ? patch : {...m, ...patch}) : m));
     save(mons);
   };
-  const addMon = name => {
-    const mons = [...team.mons, newMon(name)];
+  const addMon = (name, extra) => {
+    const mons = [...team.mons, applyExtra(newMon(name), extra)];
     save(mons);
     setSlot(mons.length - 1);
     setAdding(false);
@@ -327,7 +389,7 @@ export function TeamEditor({team, onChange, onBack, onBattle}) {
       ) : (
         <div class="card panel" style={{justifyItems: 'start'}}>
           <h3>Pick your first Pokémon</h3>
-          <p class="muted">Any Pokémon from any generation. Mega Evolutions come from Mega Stones, and Gigantamax is a switch on Pokémon that have it.</p>
+          <p class="muted">Any Pokémon from any generation. Search "Mega" to find Mega Evolutions: you get the Pokémon holding its Mega Stone, and Mega Evolve shows up in battle.</p>
           <button class="btn btn-primary" onClick={() => setAdding(true)}>Choose a Pokémon</button>
         </div>
       )}

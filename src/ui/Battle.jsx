@@ -1,6 +1,6 @@
 // The battle screen: stadium, command deck, team preview, turn replays and the log.
 import {useEffect, useLayoutEffect, useReducer, useRef, useState} from 'preact/hooks';
-import {dex, toID} from '../engine/dex.js';
+import {dex, toID, megaOptions, megaName, itemGimmick} from '../engine/dex.js';
 import {targetOptions} from '../engine/choices.js';
 import {MODES, STAT_LABELS} from '../engine/constants.js';
 import {FitSprite, Sprite, TypeBadge, spriteStyle} from './sprites.jsx';
@@ -250,6 +250,13 @@ function TeamPreview({game, player}) {
                 <span style={{minWidth: 0}}>
                   <span class="pm-name" style={{display: 'block'}}>{p.ident.split(': ')[1]}</span>
                   <span class="pm-sub" style={{display: 'block'}}>{dex.items.get(p.item).name || 'No item'} · {dex.abilities.get(p.baseAbility).name}</span>
+                  <span style={{display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap'}}>
+                    {itemGimmick(p.item, species)?.kind === 'mega' && <span class="gimmick-badge g-mega">Mega</span>}
+                    {species === 'Rayquaza' && set?.moves?.some(m => toID(m) === 'dragonascent') && <span class="gimmick-badge g-mega">Mega</span>}
+                    {itemGimmick(p.item, species)?.kind === 'z' && <span class="gimmick-badge g-z">Z-Move</span>}
+                    {set?.gmax && <span class="gimmick-badge g-gmax">G-Max</span>}
+                    {set?.teraType && <span class="gimmick-badge g-tera">Tera {set.teraType}</span>}
+                  </span>
                 </span>
                 <span class={`order-num${n >= 0 && n < leads ? ' lead' : ''}`}>{n >= 0 ? n + 1 : ''}</span>
               </button>
@@ -282,6 +289,12 @@ function TeamPreview({game, player}) {
 // ---------- command deck ----------
 
 const GIMMICK_LABELS = {mega: 'Mega Evolve', zmove: 'Z-Power', dynamax: 'Dynamax', terastallize: 'Terastallize'};
+const GIMMICK_HINTS = {
+  mega: 'It Mega Evolves before anyone moves.',
+  zmove: 'Your move becomes its Z-Move.',
+  dynamax: 'It Dynamaxes for 3 turns, and its moves become Max Moves.',
+  terastallize: 'Its type changes to its Tera Type for the rest of the battle.',
+};
 
 function SwitchButton({p, index, disabled, onClick}) {
   const c = parseCondition(p.condition);
@@ -502,23 +515,36 @@ function CommandDeck({game, player}) {
   }
 
   const canSwitch = !active.trapped && !active.maybeTrapped;
+  const currentSpecies = speciesOf(currentMon?.details);
+  const megaInto = active.canMegaEvo ?
+    (megaOptions(currentSpecies).find(o => o.item && toID(o.item) === currentMon.item) ||
+      megaOptions(currentSpecies).find(o => o.move))?.mega : null;
+  const gmaxInto = active.maxMoves?.gigantamax ? `${currentSpecies}-Gmax` : null;
   return (
     <div class="card deck">
       {header}
       {(Object.values(available).some(Boolean)) && (
-        <div class="gimmicks">
-          {Object.entries(available).filter(([, ok]) => ok).map(([key]) => {
-            const blocked = usedGimmicks.includes(key);
-            const label = key === 'dynamax' && active.maxMoves?.gigantamax ? 'Gigantamax' :
-              key === 'terastallize' ? `Tera ${active.canTerastallize}` : GIMMICK_LABELS[key];
-            return (
-              <button key={key} class={`gimmick-toggle ${key}`} aria-pressed={gimmick === key} disabled={blocked}
-                title={blocked ? 'Already chosen for another Pokémon this turn' : ''}
-                onClick={() => setGimmick(gimmick === key ? null : key)}>
-                <span class="dot" />{label}
-              </button>
-            );
-          })}
+        <div class="gimmick-bar">
+          <div class="gimmicks">
+            {Object.entries(available).filter(([, ok]) => ok).map(([key]) => {
+              const blocked = usedGimmicks.includes(key);
+              const label = key === 'dynamax' && gmaxInto ? 'Gigantamax' :
+                key === 'terastallize' ? `Tera ${active.canTerastallize}` : GIMMICK_LABELS[key];
+              const preview = key === 'mega' ? megaInto : key === 'dynamax' ? gmaxInto : null;
+              return (
+                <button key={key} class={`gimmick-toggle ${key}`} aria-pressed={gimmick === key} disabled={blocked}
+                  title={blocked ? 'Already chosen for another Pokémon this turn' : GIMMICK_HINTS[key]}
+                  onClick={() => setGimmick(gimmick === key ? null : key)}>
+                  {preview ? <FitSprite name={preview} width={36} height={30} /> : <span class="dot" />}
+                  <span class="gt-text">
+                    <span>{label}</span>
+                    {key === 'mega' && megaInto && <span class="gt-sub">into {megaName(megaInto)}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p class="gimmick-hint">{gimmick ? `${GIMMICK_HINTS[gimmick]} Now pick a move.` : 'Turn one on, then pick a move. Each can be used once per battle.'}</p>
         </div>
       )}
       <div class="move-grid">

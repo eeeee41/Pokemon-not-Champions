@@ -109,3 +109,35 @@ export function emptySP() {
 export function clampSP(v) {
   return Math.max(0, Math.min(SP_MAX, Math.round(Number(v) || 0)));
 }
+
+let megaIndex = null;
+/**
+ * Every way a species can Mega Evolve: [{item, mega}] for Mega Stones, or
+ * [{move, mega}] for Rayquaza, which needs Dragon Ascent instead of a stone.
+ */
+export function megaOptions(speciesName) {
+  if (!megaIndex) {
+    megaIndex = new Map();
+    const add = (base, option) => {
+      if (!megaIndex.has(base)) megaIndex.set(base, []);
+      megaIndex.get(base).push(option);
+    };
+    for (const item of dex.items.all()) {
+      if (!inGame(item) || !item.megaStone) continue;
+      for (const [base, mega] of Object.entries(item.megaStone)) {
+        if (inGame(dex.species.get(mega))) add(base, {item: item.name, mega});
+      }
+    }
+    for (const s of dex.species.all()) {
+      if (s.isMega && s.requiredMove && inGame(s)) add(s.baseSpecies, {move: s.requiredMove, mega: s.name});
+    }
+    for (const list of megaIndex.values()) list.sort((a, b) => a.mega.localeCompare(b.mega));
+  }
+  const s = dex.species.get(speciesName);
+  return megaIndex.get(s.name) || [];
+}
+
+/** "Charizard-Mega-X" → "Mega Charizard X". */
+export function megaName(formeName) {
+  return String(formeName).replace(/^(.*?)-Mega(?:-([A-Z]))?$/, (_, base, v) => `Mega ${base}${v ? ` ${v}` : ''}`);
+}

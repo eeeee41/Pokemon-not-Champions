@@ -1,6 +1,6 @@
 // Searchable pickers for species, items and moves, shown in a sheet.
 import {useEffect, useMemo, useRef, useState} from 'preact/hooks';
-import {dex, toID, selectableSpecies, selectableItems, itemGimmick} from '../engine/dex.js';
+import {dex, toID, selectableSpecies, selectableItems, itemGimmick, megaOptions, megaName} from '../engine/dex.js';
 import {learnableMoves} from '../engine/learnsets.js';
 import {TYPES, STATS} from '../engine/constants.js';
 import {requiredItems} from '../engine/team.js';
@@ -50,52 +50,116 @@ function bst(s) {
   return STATS.reduce((a, k) => a + s.baseStats[k], 0);
 }
 
+// Megas and Gigantamax formes are battle-only, but players look for them by
+// name. These rows stand for "the base Pokémon, set up to transform".
+let specialRows = null;
+function getSpecialRows() {
+  if (specialRows) return specialRows;
+  specialRows = [];
+  for (const s of selectableSpecies()) {
+    for (const o of megaOptions(s.name)) {
+      const forme = dex.species.get(o.mega);
+      specialRows.push({
+        kind: 'mega', key: `mega-${forme.id}`, base: s.name, forme, label: megaName(forme.name),
+        ids: [toID(megaName(forme.name)), forme.id],
+        sub: o.item ? `${s.name} holding ${o.item}` : `${s.name} knowing ${o.move}`,
+        extra: o.item ? {item: o.item} : {move: o.move},
+      });
+    }
+    if (s.canGigantamax) {
+      const forme = dex.species.get(`${s.name}-Gmax`);
+      if (forme.exists) {
+        specialRows.push({
+          kind: 'gmax', key: `gmax-${forme.id}`, base: s.name, forme, label: `Gigantamax ${s.name}`,
+          ids: [toID(`Gigantamax ${s.name}`), forme.id, toID(`gmax ${s.name}`)],
+          sub: `${s.name} with Gigantamax on · ${s.canGigantamax}`,
+          extra: {gmax: true},
+        });
+      }
+    }
+  }
+  return specialRows;
+}
+
 export function SpeciesPicker({onPick, onClose, current}) {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
+  const [show, setShow] = useState('all');
   const input = useSearchInput();
   const all = selectableSpecies();
   const results = useMemo(() => {
     const id = toID(q);
-    let list = all;
-    if (type) list = list.filter(s => s.types.includes(type));
-    if (id) {
-      const starts = [];
-      const contains = [];
-      for (const s of list) {
-        if (s.id.startsWith(id)) starts.push(s);
-        else if (s.id.includes(id) || String(s.num) === q.trim()) contains.push(s);
-      }
-      list = [...starts, ...contains];
+    const typeOk = types => !type || types.includes(type);
+    let specials = getSpecialRows().filter(r => typeOk(r.forme.types));
+    if (show === 'mega') specials = specials.filter(r => r.kind === 'mega');
+    if (show === 'gmax') specials = specials.filter(r => r.kind === 'gmax');
+    if (show !== 'all') {
+      return id ? specials.filter(r => r.ids.some(x => x.includes(id)) || toID(r.base).includes(id)) : specials;
     }
-    return list;
-  }, [q, type]);
+    let list = all.filter(s => typeOk(s.types)).map(s => ({kind: 'species', key: s.id, species: s}));
+    if (!id) return list;
+    const starts = [];
+    const contains = [];
+    for (const row of list) {
+      const s = row.species;
+      if (s.id.startsWith(id)) starts.push(row);
+      else if (s.id.includes(id) || String(s.num) === q.trim()) contains.push(row);
+    }
+    const extra = specials.filter(r => r.ids.some(x => x.includes(id)));
+    return [...starts, ...contains, ...extra];
+  }, [q, type, show]);
   return (
     <Sheet
       title="Choose a Pokémon"
       onClose={onClose}
       tools={<>
-        <input ref={input} id="species-search" class="input" placeholder="Search by name or Pokédex number" value={q} onInput={e => setQ(e.currentTarget.value)} />
-        <select id="species-type" class="select" style={{flex: '0 1 160px'}} value={type} onChange={e => setType(e.currentTarget.value)}>
+        <input ref={input} id="species-search" class="input" placeholder="Search: Garchomp, Mega Charizard, 445…" value={q} onInput={e => setQ(e.currentTarget.value)} />
+        <select id="species-show" class="select" style={{flex: '0 1 170px'}} value={show} onChange={e => setShow(e.currentTarget.value)} aria-label="Show">
+          <option value="all">All Pokémon</option>
+          <option value="mega">Mega Evolutions</option>
+          <option value="gmax">Gigantamax</option>
+        </select>
+        <select id="species-type" class="select" style={{flex: '0 1 140px'}} value={type} onChange={e => setType(e.currentTarget.value)} aria-label="Type">
           <option value="">All types</option>
           {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </>}
     >
       <div class="pick-list" role="listbox" aria-label="Pokémon">
-        {results.slice(0, LIMIT).map(s => (
-          <button key={s.id} class={`pick-row${current === s.name ? ' active' : ''}`} role="option" aria-selected={current === s.name} onClick={() => onPick(s.name)}>
-            <FitSprite name={s.name} width={52} height={44} />
-            <span class="pick-main">
-              <span class="pick-title">{s.name} <Types types={s.types} small /></span>
-              <span class="pick-sub">#{s.num} · {Object.values(s.abilities).filter(Boolean).join(' / ')}</span>
-            </span>
-            <span class="pick-side">
-              {s.canGigantamax && <span class="gimmick-badge g-gmax" title="Can Gigantamax">G-Max</span>}
-              <span class="bst" title="Base stat total">{bst(s)}</span>
-            </span>
-          </button>
-        ))}
+        {show === 'mega' && <p class="pick-more" style={{textAlign: 'left'}}>Picking a Mega adds the Pokémon holding its Mega Stone. In battle, turn on Mega Evolve before choosing a move.</p>}
+        {show === 'gmax' && <p class="pick-more" style={{textAlign: 'left'}}>Picking one adds the Pokémon with Gigantamax switched on. In battle, choose Gigantamax before a move.</p>}
+        {results.slice(0, LIMIT).map(row => {
+          if (row.kind === 'species') {
+            const s = row.species;
+            return (
+              <button key={row.key} class={`pick-row${current === s.name ? ' active' : ''}`} role="option" aria-selected={current === s.name} onClick={() => onPick(s.name)}>
+                <FitSprite name={s.name} width={52} height={44} />
+                <span class="pick-main">
+                  <span class="pick-title">{s.name} <Types types={s.types} small /></span>
+                  <span class="pick-sub">#{s.num} · {Object.values(s.abilities).filter(Boolean).join(' / ')}</span>
+                </span>
+                <span class="pick-side">
+                  {megaOptions(s.name).length > 0 && <span class="gimmick-badge g-mega" title="Can Mega Evolve">Mega</span>}
+                  {s.canGigantamax && <span class="gimmick-badge g-gmax" title="Can Gigantamax">G-Max</span>}
+                  <span class="bst" title="Base stat total">{bst(s)}</span>
+                </span>
+              </button>
+            );
+          }
+          return (
+            <button key={row.key} class="pick-row" role="option" aria-selected="false" onClick={() => onPick(row.base, row.extra)}>
+              <FitSprite name={row.forme.name} width={52} height={44} />
+              <span class="pick-main">
+                <span class="pick-title">{row.label} <Types types={row.forme.types} small /></span>
+                <span class="pick-sub">{row.sub}</span>
+              </span>
+              <span class="pick-side">
+                <span class={`gimmick-badge ${row.kind === 'mega' ? 'g-mega' : 'g-gmax'}`}>{row.kind === 'mega' ? 'Mega' : 'G-Max'}</span>
+                <span class="bst" title="Base stat total">{bst(row.forme)}</span>
+              </span>
+            </button>
+          );
+        })}
         {results.length > LIMIT && <p class="pick-more">Showing {LIMIT} of {results.length}. Keep typing to narrow it down.</p>}
         {!results.length && <p class="pick-more">No Pokémon match "{q}".</p>}
       </div>

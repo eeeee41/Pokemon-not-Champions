@@ -60,7 +60,8 @@ export function getFormat(mode) {
   format.name = `[Gen 9] Champions ${MODES[mode].label}`;
   format.ruleset = ['Team Preview', 'Cancel Mod', 'Endless Battle Clause'];
   format.banlist = [];
-  format.unbanlist = [];
+  // Past/Future content is allowed; the simulator also reads this to allow Mega Rayquaza.
+  format.unbanlist = ['Past', 'Future'];
   format.restricted = [];
   format.customRules = null;
   format.ruleTable = null;

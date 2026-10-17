@@ -352,6 +352,15 @@ a { color: var(--gold-ink); }
   border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 600; font-size: .9rem;
 }
 .choice[aria-pressed="true"] { border-color: var(--gold); background: var(--gold-soft); color: var(--gold-ink); }
+.mega-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.mega-option {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px 10px 4px 4px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; font-weight: 400;
+}
+.mega-option:hover { border-color: var(--ink-3); }
+.mega-option[aria-pressed="true"] { border-color: #a24bd8; box-shadow: 0 0 0 1px #a24bd8 inset; background: color-mix(in srgb, #a24bd8 12%, var(--surface)); }
+.mega-option strong { font-family: var(--font-display); font-size: 1rem; }
+.mega-option .dim { font-size: .82rem; }
 .tera-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 4px; }
 .tera-grid button { border: 2px solid transparent; border-radius: 7px; padding: 0; background: none; cursor: pointer; }
 .tera-grid button .type { width: 100%; }
@@ -558,19 +567,25 @@ a { color: var(--gold-ink); }
 .deck-slot-pill { font-family: var(--font-display); font-weight: 700; font-size: .82rem; padding: 3px 9px; border-radius: 6px; background: var(--surface-2); color: var(--ink-2); }
 .deck-slot-pill.current { background: var(--gold); color: var(--on-gold); }
 .deck-slot-pill.done { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.gimmick-bar { display: grid; gap: 6px; }
 .gimmicks { display: flex; gap: 8px; flex-wrap: wrap; }
 .gimmick-toggle {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border-radius: 9px;
-  border: 2px solid var(--line); background: var(--surface); cursor: pointer;
-  font-family: var(--font-display); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; font-size: .9rem;
+  --g1: #7c3aed; --g2: #db2777;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 4px 14px 4px 8px; border-radius: 10px;
+  border: 2px solid var(--g1); background: color-mix(in srgb, var(--g1) 12%, var(--surface)); color: var(--ink); cursor: pointer;
+  font-family: var(--font-display); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; font-size: .95rem; text-align: left;
 }
-.gimmick-toggle .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; }
-.gimmick-toggle[aria-pressed="true"] { color: #fff; border-color: transparent; }
+.gimmick-toggle:hover { background: color-mix(in srgb, var(--g1) 22%, var(--surface)); }
+.gimmick-toggle[disabled] { opacity: .45; cursor: not-allowed; }
+.gimmick-toggle .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--g1); margin-left: 4px; }
+.gimmick-toggle .gt-text { display: grid; line-height: 1.15; }
+.gimmick-toggle .gt-sub { font-family: var(--font-body); font-weight: 600; font-size: .78rem; letter-spacing: 0; text-transform: none; opacity: .85; }
+.gimmick-toggle[aria-pressed="true"] { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--g1), var(--g2)); box-shadow: 0 4px 14px color-mix(in srgb, var(--g1) 40%, transparent); }
 .gimmick-toggle[aria-pressed="true"] .dot { background: #fff; border-color: #fff; }
-.gimmick-toggle.mega[aria-pressed="true"] { background: linear-gradient(135deg, #7c3aed, #db2777); }
-.gimmick-toggle.zmove[aria-pressed="true"] { background: linear-gradient(135deg, #ca8a04, #ea580c); }
-.gimmick-toggle.dynamax[aria-pressed="true"] { background: linear-gradient(135deg, #b91c1c, #e11d48); }
-.gimmick-toggle.terastallize[aria-pressed="true"] { background: linear-gradient(135deg, #0891b2, #6366f1); }
+.gimmick-toggle.zmove { --g1: #c27c03; --g2: #ea580c; }
+.gimmick-toggle.dynamax { --g1: #c0182b; --g2: #e11d48; }
+.gimmick-toggle.terastallize { --g1: #0b8bb0; --g2: #6366f1; }
+.gimmick-hint { font-size: .85rem; color: var(--ink-2); }
 .move-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .move-btn {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 8px; align-items: center;
