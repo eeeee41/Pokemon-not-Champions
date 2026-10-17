@@ -1,0 +1,28 @@
+{
+  "name": "champions-pvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pokémon Champions-style PvP battles: Singles and Doubles, all generations, Mega, Z-Moves, Gigantamax and Tera.",
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "sprites": "python3 scripts/build-sprites.py",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@pkmn/client": "^0.7.3",
+    "@pkmn/data": "^0.10.11",
+    "@pkmn/protocol": "^0.7.3",
+    "@pkmn/sim": "^0.10.11",
+    "@pkmn/view": "^0.7.3",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
