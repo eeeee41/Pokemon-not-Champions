@@ -11,37 +11,46 @@ const ALIASES = {
   pichuspikyeared: 'pichu',
 };
 
-const resolved = {front: new Map(), back: new Map(), items: new Map()};
+const resolved = new Map();
 
-function resolve(sheet, name) {
-  const cache = resolved[sheet];
-  if (cache.has(name)) return cache.get(name);
+/**
+ * Finds a sprite id in one sheet. exact=true only accepts the forme itself (or
+ * an alias drawn the same); exact=false also accepts related formes.
+ */
+function resolve(sheet, name, exact = true) {
+  const key = `${sheet}|${exact ? 1 : 0}|${name}`;
+  if (resolved.has(key)) return resolved.get(key);
   const table = manifest[sheet]?.sprites || {};
-  let id = toID(name);
+  const id = toID(name);
   let found = null;
   if (table[id]) found = id;
   else if (ALIASES[id] && table[ALIASES[id]]) found = ALIASES[id];
-  else if (sheet !== 'items') {
+  else if (!exact && sheet !== 'items') {
     const s = dex.species.get(name);
     if (s.exists) {
-      const candidates = [s.id, toID(s.baseSpecies + (s.forme && /Gmax$/.test(s.forme) ? 'gmax' : '')), toID(s.baseSpecies)];
-      if (s.battleOnly && typeof s.battleOnly === 'string') candidates.push(toID(s.battleOnly));
+      const candidates = [toID(s.baseSpecies + (s.forme && /Gmax$/.test(s.forme) ? 'gmax' : '')), toID(s.baseSpecies)];
+      if (s.battleOnly && typeof s.battleOnly === 'string') candidates.unshift(toID(s.battleOnly));
       found = candidates.find(c => table[c]) || null;
     }
   }
-  cache.set(name, found);
+  resolved.set(key, found);
   return found;
 }
 
-/** Where a Pokémon's sprite lives. Back sprites fall back to a mirrored front. */
+/**
+ * Where a Pokémon's sprite lives. For the back view, the forme's own art wins
+ * over a related forme's back sprite (a Mega with no back sprite shows its
+ * mirrored front, not the regular Pokémon's back).
+ */
 export function spriteInfo(name, back = false) {
-  if (back) {
-    const id = resolve('back', name);
-    if (id) return {sheet: 'back', rect: manifest.back.sprites[id]};
+  const steps = back ?
+    [['back', true, false], ['front', true, true], ['back', false, false], ['front', false, true]] :
+    [['front', true, false], ['front', false, false]];
+  for (const [sheet, exact, flip] of steps) {
+    const id = resolve(sheet, name, exact);
+    if (id) return {sheet, rect: manifest[sheet].sprites[id], flip};
   }
-  const id = resolve('front', name);
-  if (!id) return null;
-  return {sheet: 'front', rect: manifest.front.sprites[id], flip: back};
+  return null;
 }
 
 export function spriteSize(name, back = false) {
