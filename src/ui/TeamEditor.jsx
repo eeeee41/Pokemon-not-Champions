@@ -10,7 +10,7 @@ import {
 import {STATS, STAT_LABELS, STAT_NAMES, SP_TOTAL, SP_MAX, TEAM_SIZE, TERA_TYPES, MAX_MOVES} from '../engine/constants.js';
 import {FitSprite, Sprite, ItemIcon, TypeBadge, Types, ShinyMark} from './sprites.jsx';
 import {SpeciesPicker, ItemPicker, MovePicker} from './pickers.jsx';
-import {StatusChip} from './Teams.jsx';
+import {StatusChip, SaveCodeSheet} from './Teams.jsx';
 
 function natureLabel(n) {
   if (!n.plus) return `${n.name} (no change)`;
@@ -328,6 +328,7 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
 export function TeamEditor({team, onChange, onBack, onBattle}) {
   const [slot, setSlot] = useState(team.mons.length ? 0 : -1);
   const [adding, setAdding] = useState(!team.mons.length);
+  const [coding, setCoding] = useState(false);
   const validation = validateTeam(team);
   const problemSlots = new Set(validation.problems.filter(p => p.index !== null).map(p => p.index));
   const teamProblems = validation.problems.filter(p => p.index === null);
@@ -360,6 +361,7 @@ export function TeamEditor({team, onChange, onBack, onBattle}) {
         <input id="team-name" class="input" value={team.name} maxLength={40} onInput={e => onChange({...team, name: e.currentTarget.value, updated: Date.now()})} />
         <StatusChip team={team} />
         <span style={{flex: 1}} />
+        <button class="btn" disabled={!team.mons.length} onClick={() => setCoding(true)}>Save code</button>
         <button class="btn btn-primary" disabled={!validation.ok} onClick={onBattle} title={validation.ok ? '' : 'Fix the problems first'}>Battle with this team</button>
       </div>
       {teamProblems.length > 0 && <ul class="error-list">{teamProblems.map(p => <li key={p.text}>{p.text}</li>)}</ul>}
@@ -394,6 +396,7 @@ export function TeamEditor({team, onChange, onBack, onBattle}) {
         </div>
       )}
       {adding && <SpeciesPicker onPick={addMon} onClose={() => setAdding(false)} />}
+      {coding && <SaveCodeSheet team={team} onClose={() => setCoding(false)} />}
     </section>
   );
 }

@@ -211,6 +211,7 @@ a { color: var(--gold-ink); }
   border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
 }
 .textarea { min-height: 220px; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: .85rem; line-height: 1.5; resize: vertical; }
+.code-box { min-height: 0; height: 7.5em; word-break: break-all; font-size: .9rem; }
 .input:focus, .select:focus, .textarea:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
 .label { display: grid; gap: 6px; font-weight: 600; font-size: .9rem; min-width: 0; }
 .label > span:first-child { color: var(--ink-2); }

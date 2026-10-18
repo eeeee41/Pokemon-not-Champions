@@ -2,6 +2,7 @@
 import {useState} from 'preact/hooks';
 import {validateTeam, newTeam, importTeams, exportTeam, uid} from '../engine/team.js';
 import {sampleTeams} from '../engine/samples.js';
+import {encodeTeam, decodeTeam, findSaveCodes} from '../engine/savecode.js';
 import {TEAM_SIZE} from '../engine/constants.js';
 import {FitSprite} from './sprites.jsx';
 import {Sheet} from './pickers.jsx';
@@ -23,12 +24,12 @@ export function StatusChip({team}) {
   return <span class="chip chip-bad">{problems.length} {problems.length === 1 ? 'problem' : 'problems'}</span>;
 }
 
-function CopyButton({text}) {
-  const [state, setState] = useState('Copy');
+function CopyButton({text, target = 'export-text', label = 'Copy'}) {
+  const [state, setState] = useState(label);
   const copy = () => {
     const done = () => setState('Copied');
     const fail = () => {
-      const area = document.getElementById('export-text');
+      const area = document.getElementById(target);
       if (area) {
         area.focus();
         area.select();
@@ -56,28 +57,52 @@ function ExportSheet({team, onClose}) {
   );
 }
 
+export function SaveCodeSheet({team, onClose}) {
+  const code = encodeTeam(team);
+  return (
+    <Sheet title={`Save code for "${team.name}"`} onClose={onClose} foot={<CopyButton text={code} target="save-code-text" label="Copy save code" />}>
+      <div style={{padding: '8px', display: 'grid', gap: '10px'}}>
+        <p class="muted">This code is the whole team: Pokémon, moves, items, natures, stat points, Tera Types and nicknames. Keep it somewhere safe, like a note or a message to yourself. On any device, go to Teams, then Load a team, and paste it to get this team back.</p>
+        <textarea id="save-code-text" class="textarea code-box" readOnly value={code} onFocus={e => e.currentTarget.select()} />
+      </div>
+    </Sheet>
+  );
+}
+
 function ImportSheet({onImport, onClose}) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const submit = () => {
-    const teams = importTeams(text);
+    const codes = findSaveCodes(text);
+    const teams = [];
+    const problems = [];
+    for (const code of codes) {
+      try {
+        teams.push(decodeTeam(code));
+      } catch (e) {
+        problems.push(e.message);
+      }
+    }
+    // Anything that isn't a save code is read as Showdown text.
+    const rest = codes.reduce((t, c) => t.replace(c, ''), text);
+    if (rest.trim()) teams.push(...importTeams(rest));
     if (!teams.length) {
-      setError('No Pokémon found. Paste a team in Showdown text format: one Pokémon per block, separated by a blank line.');
+      setError(problems[0] || 'No team found. Paste a save code (it starts with CPV1.) or a team in Showdown text format.');
       return;
     }
-    onImport(teams);
+    onImport(teams, problems);
   };
   return (
     <Sheet
-      title="Import teams"
+      title="Load a team"
       onClose={onClose}
       foot={<>
         <button class="btn" onClick={onClose}>Cancel</button>
-        <button class="btn btn-primary" onClick={submit} disabled={!text.trim()}>Import</button>
+        <button class="btn btn-primary" onClick={submit} disabled={!text.trim()}>Load</button>
       </>}
     >
       <div style={{padding: '8px', display: 'grid', gap: '8px'}}>
-        <p class="muted">Paste a team from Pokémon Showdown or from this site. EVs are converted to stat points (8 EVs ≈ 1 point), and a Showdown backup with several teams imports them all.</p>
+        <p class="muted">Paste a save code (it starts with CPV1.) or a team from Pokémon Showdown. You can paste several at once. Showdown EVs become stat points (8 EVs ≈ 1 point).</p>
         <textarea
           id="import-text"
           class="textarea"
@@ -86,7 +111,7 @@ function ImportSheet({onImport, onClose}) {
             setText(e.currentTarget.value);
             setError('');
           }}
-          placeholder={'Garchomp @ Garchompite\nAbility: Rough Skin\nTera Type: Ground\nSPs: 2 HP / 32 Atk / 32 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Swords Dance\n- Protect'}
+          placeholder={'CPV1.E9TdGFydGVyIFNpbmdsZXPIGARCHOMP…\n\nor Showdown text:\n\nGarchomp @ Garchompite\nAbility: Rough Skin\nTera Type: Ground\nSPs: 2 HP / 32 Atk / 32 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Swords Dance\n- Protect'}
         />
         {error && <p class="error-list" style={{listStyle: 'none', paddingLeft: 0}}>{error}</p>}
       </div>
@@ -97,6 +122,7 @@ function ImportSheet({onImport, onClose}) {
 export function TeamsPage({teams, setTeams, onEdit}) {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(null);
+  const [coding, setCoding] = useState(null);
   const [confirming, setConfirming] = useState(null);
   const [message, setMessage] = useState('');
 
@@ -132,7 +158,7 @@ export function TeamsPage({teams, setTeams, onEdit}) {
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" onClick={create}>New team</button>
-          <button class="btn" onClick={() => setImporting(true)}>Import</button>
+          <button class="btn" onClick={() => setImporting(true)}>Load a team</button>
           <button class="btn btn-ghost" onClick={addStarters}>Add starter teams</button>
         </div>
       </div>
@@ -166,6 +192,7 @@ export function TeamsPage({teams, setTeams, onEdit}) {
               </div>
             ) : (
               <div class="btn-row">
+                <button class="btn btn-sm btn-ghost" onClick={() => setCoding(team)}>Save code</button>
                 <button class="btn btn-sm btn-ghost" onClick={() => setExporting(team)}>Export</button>
                 <button class="btn btn-sm btn-ghost" onClick={() => duplicate(team)}>Duplicate</button>
                 <button class="btn btn-sm btn-ghost btn-danger" onClick={() => setConfirming(team.id)}>Delete</button>
@@ -177,14 +204,16 @@ export function TeamsPage({teams, setTeams, onEdit}) {
       {importing && (
         <ImportSheet
           onClose={() => setImporting(false)}
-          onImport={imported => {
+          onImport={(imported, problems = []) => {
             setTeams([...teams, ...imported]);
             setImporting(false);
-            setMessage(`Imported ${imported.length} ${imported.length === 1 ? 'team' : 'teams'}.`);
+            setMessage(`Loaded ${imported.length} ${imported.length === 1 ? 'team' : 'teams'}: ${imported.map(t => t.name).join(', ')}.` +
+              (problems.length ? ` ${problems.length} code${problems.length === 1 ? '' : 's'} couldn't be read: ${problems[0]}` : ''));
           }}
         />
       )}
       {exporting && <ExportSheet team={exporting} onClose={() => setExporting(null)} />}
+      {coding && <SaveCodeSheet team={coding} onClose={() => setCoding(null)} />}
     </section>
   );
 }

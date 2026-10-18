@@ -36,9 +36,16 @@ export function selectableSpecies() {
 let itemCache = null;
 export function selectableItems() {
   if (!itemCache) {
-    itemCache = dex.items.all()
-      .filter(i => inGame(i) && !i.isPokeball && i.id !== 'pokeball' && !/^TR\d/.test(i.name) && i.desc)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const usable = dex.items.all()
+      .filter(i => inGame(i) && !i.isPokeball && i.id !== 'pokeball' && !/^TR\d/.test(i.name) && i.desc);
+    // Gen 2 names (Gold Berry, Pink Bow, Stick...) share a number with a modern
+    // item; keep the newest so every item has its own number (save codes rely on it).
+    const newest = new Map();
+    for (const i of usable) {
+      const prev = newest.get(i.num);
+      if (!prev || i.gen > prev.gen) newest.set(i.num, i);
+    }
+    itemCache = usable.filter(i => newest.get(i.num) === i).sort((a, b) => a.name.localeCompare(b.name));
   }
   return itemCache;
 }
