@@ -24,6 +24,10 @@ npx serve dist    # or any static server, then open the printed URL
 
 `npm run dev` rebuilds on every change.
 
+The build also writes `dist/champions-pvp-offline.html`: the whole game, sprites included, in one
+file (about 8 MB). Copy it to any computer and double-click it to play, with no server or
+internet needed. Teams save in that browser.
+
 ## Rules, in code
 
 | Rule | Where |

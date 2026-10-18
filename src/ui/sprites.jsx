@@ -4,6 +4,13 @@ import {dex, toID} from '../engine/dex.js';
 
 export const ASSET_BASE = 'assets/';
 
+// The one-file offline copy carries its sprite sheets inside the page and hands
+// them over as blob URLs; the hosted site loads them from assets/.
+function assetUrl(file) {
+  const offline = typeof window !== 'undefined' && window.CHAMPIONS_ASSETS;
+  return (offline && offline[file]) || ASSET_BASE + file;
+}
+
 // Formes drawn with another forme's art.
 const ALIASES = {
   toxtricitylowkeygmax: 'toxtricitygmax',
@@ -74,7 +81,7 @@ export function spriteStyle(name, back = false, scale = 1, mask = false, shiny =
   const [x, y, w, h] = info.rect;
   const sheet = manifest[info.sheet];
   const [W, H] = sheet.size;
-  const url = `url(${ASSET_BASE}${sheet.file})`;
+  const url = `url(${assetUrl(sheet.file)})`;
   const pos = `${-x * scale}px ${-y * scale}px`;
   const size = `${W * scale}px ${H * scale}px`;
   const style = {width: `${w * scale}px`, height: `${h * scale}px`};
@@ -128,7 +135,7 @@ export function ItemIcon({item, size = 24}) {
       style={{
         width: `${w * scale}px`,
         height: `${h * scale}px`,
-        backgroundImage: `url(${ASSET_BASE}${manifest.items.file})`,
+        backgroundImage: `url(${assetUrl(manifest.items.file)})`,
         backgroundPosition: `${-x * scale}px ${-y * scale}px`,
         backgroundSize: `${W * scale}px ${H * scale}px`,
       }}
