@@ -27,3 +27,9 @@ test('every Gigantamax forme has its own front sprite', () => {
     .map(g => g.name);
   assert.deepEqual(missing, []);
 });
+
+test('every forme with normal art also has shiny art', () => {
+  const front = Object.keys(manifest.front.sprites).filter(id => !manifest['front-shiny']?.sprites[id]);
+  const back = Object.keys(manifest.back.sprites).filter(id => !manifest['back-shiny']?.sprites[id]);
+  assert.deepEqual({front, back}, {front: [], back: []});
+});

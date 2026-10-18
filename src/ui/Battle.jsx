@@ -3,7 +3,7 @@ import {useEffect, useLayoutEffect, useReducer, useRef, useState} from 'preact/h
 import {dex, toID, megaOptions, megaName, itemGimmick} from '../engine/dex.js';
 import {targetOptions} from '../engine/choices.js';
 import {MODES, STAT_LABELS} from '../engine/constants.js';
-import {FitSprite, Sprite, TypeBadge, spriteStyle} from './sprites.jsx';
+import {FitSprite, Sprite, TypeBadge, ShinyMark, spriteStyle, detailsShiny} from './sprites.jsx';
 
 // ---------- helpers ----------
 
@@ -81,19 +81,27 @@ function useElementWidth(ref) {
 
 // ---------- stadium ----------
 
+// Where the sparkles of a shiny's entrance appear, as % of the sprite box, plus a delay in ms.
+const SPARKS = [[12, 22, 0], [86, 14, 110], [52, -4, 220], [96, 58, 330], [4, 66, 160], [64, 42, 270], [32, 88, 390], [78, 84, 60]];
+const FX_FRESH_MS = 1200;
+
 function FieldMon({pokemon, tracker, own, pos, unit, fx}) {
-  const [anim, setAnim] = useState('enter');
+  const [anim, setAnim] = useState('');
+  const [sparkle, setSparkle] = useState(0);
   useEffect(() => {
-    const t = setTimeout(() => setAnim(''), 520);
-    return () => clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (!fx) return undefined;
+    // Only effects from the step just played. A remounted stadium must not replay old ones.
+    if (!fx || performance.now() - fx.at > FX_FRESH_MS) return undefined;
+    const timers = [];
     setAnim(fx.type);
-    const t = setTimeout(() => setAnim(''), fx.type === 'flash' ? 900 : 440);
-    return () => clearTimeout(t);
+    timers.push(setTimeout(() => setAnim(''), fx.type === 'flash' ? 900 : fx.type === 'enter' ? 520 : 440));
+    if (fx.shiny) {
+      setSparkle(fx.n);
+      timers.push(setTimeout(() => setSparkle(0), 1500));
+    }
+    return () => timers.forEach(clearTimeout);
   }, [fx?.n]);
   const name = tracker.spriteName(pokemon);
+  const shiny = !!pokemon.shiny;
   const dynamax = !!pokemon.volatiles?.dynamax;
   const scale = (own ? 2.05 : 1.5) * unit * (dynamax ? 1.4 : 1);
   const tera = pokemon.terastallized;
@@ -101,9 +109,14 @@ function FieldMon({pokemon, tracker, own, pos, unit, fx}) {
   return (
     <div class={`mon ${own ? 'own' : 'foe'}`} style={{left: `${pos.x}%`, top: `${pos.y}%`}}>
       <div class={classes}>
-        <Sprite name={name} back={own} scale={scale} />
-        {tera && <span class={`tera-crystal t-${toID(tera)}`} style={spriteStyle(name, own, scale, true)} />}
+        <Sprite name={name} back={own} shiny={shiny} scale={scale} />
+        {tera && <span class={`tera-crystal t-${toID(tera)}`} style={spriteStyle(name, own, scale, true, shiny)} />}
         {tera && <span class={`tera-jewel t-${toID(tera)}`} />}
+        {sparkle ? (
+          <span class="shiny-sparkle" key={sparkle} aria-hidden="true">
+            {SPARKS.map(([x, y, delay]) => <i key={`${x}-${y}`} style={{left: `${x}%`, top: `${y}%`, animationDelay: `${delay}ms`}} />)}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -118,7 +131,7 @@ function InfoBox({pokemon, exact, style, compact}) {
   return (
     <div class={`infobox${compact ? ' compact' : ''}${pokemon.fainted ? ' fainted' : ''}`} style={style}>
       <div class="ib-top">
-        <span class="ib-name">{pokemon.name}{gender && <span style={{color: gender === '♂' ? '#2563eb' : '#db2777', marginLeft: '4px'}}>{gender}</span>}</span>
+        <span class="ib-name">{pokemon.name}{gender && <span style={{color: gender === '♂' ? '#2563eb' : '#db2777', marginLeft: '4px'}}>{gender}</span>}{pokemon.shiny && <ShinyMark />}</span>
         {isMega && <span class="gimmick-badge g-mega">Mega</span>}
         {pokemon.volatiles?.dynamax && <span class="gimmick-badge g-gmax">Dyna</span>}
         {pokemon.terastallized && <TypeBadge type={pokemon.terastallized} small />}
@@ -197,10 +210,10 @@ export function Stadium({tracker, perspective, mode, exactOwn, fx = {}, message}
         {sideTags(foe).length > 0 && <div class="side-tags foe">{sideTags(foe).map(t => <span key={t} class="field-tag">{t}</span>)}</div>}
         {sideTags(own).length > 0 && <div class="side-tags own">{sideTags(own).map(t => <span key={t} class="field-tag">{t}</span>)}</div>}
         {foeActive.map((p, i) => p && (
-          <FieldMon key={`f${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own={false} pos={pos.foe[i]} unit={unit} fx={fx[`${foe.id}${'abc'[i]}`]} />
+          <FieldMon key={`f${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own={false} pos={pos.foe[i]} unit={unit} fx={fx[`p${foe.n + 1}${'abc'[i]}`]} />
         ))}
         {ownActive.map((p, i) => p && (
-          <FieldMon key={`o${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own pos={pos.own[i]} unit={unit} fx={fx[`${own.id}${'abc'[i]}`]} />
+          <FieldMon key={`o${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own pos={pos.own[i]} unit={unit} fx={fx[`p${own.n + 1}${'abc'[i]}`]} />
         ))}
         {!compact && foeBoxes.map(({p, i}, k) => (
           <InfoBox key={`fi${i}`} pokemon={p} exact={false} style={{left: '10px', top: `${10 + k * 64}px`}} />
@@ -246,9 +259,9 @@ function TeamPreview({game, player}) {
             const set = game.players[player].team.mons[i];
             return (
               <button key={p.ident} class={`preview-mon${n >= 0 ? ' picked' : ''}`} onClick={() => toggle(i)} aria-pressed={n >= 0}>
-                <FitSprite name={set?.gmax ? `${species}-Gmax` : species} width={56} height={48} />
+                <FitSprite name={set?.gmax ? `${species}-Gmax` : species} shiny={detailsShiny(p.details)} width={56} height={48} />
                 <span style={{minWidth: 0}}>
-                  <span class="pm-name" style={{display: 'block'}}>{p.ident.split(': ')[1]}</span>
+                  <span class="pm-name" style={{display: 'block'}}>{p.ident.split(': ')[1]}{detailsShiny(p.details) && <ShinyMark />}</span>
                   <span class="pm-sub" style={{display: 'block'}}>{dex.items.get(p.item).name || 'No item'} · {dex.abilities.get(p.baseAbility).name}</span>
                   <span style={{display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap'}}>
                     {itemGimmick(p.item, species)?.kind === 'mega' && <span class="gimmick-badge g-mega">Mega</span>}
@@ -302,9 +315,9 @@ function SwitchButton({p, index, disabled, onClick}) {
   const fraction = c.hp / c.maxhp;
   return (
     <button class="switch-btn" disabled={disabled} onClick={() => onClick(index)} title={`${species} — ${c.fainted ? 'fainted' : `${c.hp}/${c.maxhp} HP`}`}>
-      <FitSprite name={species} width={44} height={40} />
+      <FitSprite name={species} shiny={detailsShiny(p.details)} width={44} height={40} />
       <span style={{minWidth: 0, display: 'grid', gap: '3px'}}>
-        <span class="sw-name">{p.ident.split(': ')[1]}</span>
+        <span class="sw-name">{p.ident.split(': ')[1]}{detailsShiny(p.details) && <ShinyMark />}</span>
         <span class="hpbar"><span class={hpClass(fraction)} style={{width: `${c.fainted ? 0 : fraction * 100}%`}} /></span>
         <span class="dim num" style={{fontSize: '.72rem'}}>{c.fainted ? 'Fainted' : `${c.hp}/${c.maxhp}`}{c.status ? ` · ${c.status.toUpperCase()}` : ''}</span>
       </span>
@@ -500,10 +513,10 @@ function CommandDeck({game, player}) {
             const eff = isFoe && mon && mv.category !== 'Status' ? effLabel(effectiveness(mv.type, mon.types)) : '';
             return (
               <button key={loc} class="target-btn" onClick={() => finish([...filled, `move ${mv.i + 1} ${loc}${gimmick ? ` ${gimmick}` : ''}`])}>
-                {mon ? <FitSprite name={tracker.spriteName(mon)} width={52} height={46} /> : <span />}
+                {mon ? <FitSprite name={tracker.spriteName(mon)} shiny={!!mon.shiny} width={52} height={46} /> : <span />}
                 <span style={{minWidth: 0, display: 'grid'}}>
                   <span class="side-lbl">{isFoe ? 'Opponent' : idx === slot ? 'Itself' : 'Ally'}</span>
-                  <strong>{mon ? mon.name : 'Empty'}</strong>
+                  <strong>{mon ? mon.name : 'Empty'}{mon?.shiny && <ShinyMark />}</strong>
                   {eff && <span class="dim" style={{fontSize: '.8rem'}}>{eff}</span>}
                 </span>
               </button>
@@ -516,6 +529,7 @@ function CommandDeck({game, player}) {
 
   const canSwitch = !active.trapped && !active.maybeTrapped;
   const currentSpecies = speciesOf(currentMon?.details);
+  const currentShiny = detailsShiny(currentMon?.details);
   const megaInto = active.canMegaEvo ?
     (megaOptions(currentSpecies).find(o => o.item && toID(o.item) === currentMon.item) ||
       megaOptions(currentSpecies).find(o => o.move))?.mega : null;
@@ -535,7 +549,7 @@ function CommandDeck({game, player}) {
                 <button key={key} class={`gimmick-toggle ${key}`} aria-pressed={gimmick === key} disabled={blocked}
                   title={blocked ? 'Already chosen for another Pokémon this turn' : GIMMICK_HINTS[key]}
                   onClick={() => setGimmick(gimmick === key ? null : key)}>
-                  {preview ? <FitSprite name={preview} width={36} height={30} /> : <span class="dot" />}
+                  {preview ? <FitSprite name={preview} shiny={currentShiny} width={36} height={30} /> : <span class="dot" />}
                   <span class="gt-text">
                     <span>{label}</span>
                     {key === 'mega' && megaInto && <span class="gt-sub">into {megaName(megaInto)}</span>}
@@ -622,13 +636,15 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
         }
         const cmd = r.args[0];
         if (FX[cmd] && typeof r.args[1] === 'string') {
-          effects[r.args[1].slice(0, 3)] = {type: FX[cmd], n: Math.random()};
+          effects[r.args[1].slice(0, 3)] = {type: FX[cmd], n: Math.random(), at: performance.now()};
         }
         if (cmd === '-start' && toID(r.args[2]) === 'dynamax' && typeof r.args[1] === 'string') {
-          effects[r.args[1].slice(0, 3)] = {type: 'flash', n: Math.random()};
+          effects[r.args[1].slice(0, 3)] = {type: 'flash', n: Math.random(), at: performance.now()};
         }
         if ((cmd === 'switch' || cmd === 'drag' || cmd === 'replace') && typeof r.args[1] === 'string') {
-          effects[r.args[1].slice(0, 3)] = null; // a new Pokémon in this spot starts fresh
+          // A Pokémon coming in pops in; a shiny one sparkles, as in the games.
+          effects[r.args[1].slice(0, 3)] = cmd === 'replace' ? null :
+            {type: 'enter', shiny: detailsShiny(r.args[2]), n: Math.random(), at: performance.now()};
         }
         wait = r.text || cmd === '-damage' ? (DELAYS[cmd] ?? 450) : 0;
       }

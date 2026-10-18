@@ -11,7 +11,7 @@ export function TeamStrip({team, height = 52}) {
   for (let i = 0; i < TEAM_SIZE; i++) {
     const mon = team.mons[i];
     cells.push(mon ?
-      <FitSprite key={i} name={mon.gmax ? `${mon.species}-Gmax` : mon.species} width={48} height={height} title={mon.nickname || mon.species} /> :
+      <FitSprite key={i} name={mon.gmax ? `${mon.species}-Gmax` : mon.species} shiny={mon.shiny} width={48} height={height} title={mon.nickname || mon.species} /> :
       <span key={i} class="empty-slot" />);
   }
   return <div class="team-strip">{cells}</div>;

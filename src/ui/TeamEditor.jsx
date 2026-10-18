@@ -8,7 +8,7 @@ import {
   validateTeam, validateMon, newMon, spUsed, requiredItems, cleanName,
 } from '../engine/team.js';
 import {STATS, STAT_LABELS, STAT_NAMES, SP_TOTAL, SP_MAX, TEAM_SIZE, TERA_TYPES, MAX_MOVES} from '../engine/constants.js';
-import {FitSprite, Sprite, ItemIcon, TypeBadge, Types} from './sprites.jsx';
+import {FitSprite, Sprite, ItemIcon, TypeBadge, Types, ShinyMark} from './sprites.jsx';
 import {SpeciesPicker, ItemPicker, MovePicker} from './pickers.jsx';
 import {StatusChip} from './Teams.jsx';
 
@@ -69,7 +69,7 @@ function MegaPicker({mon, onChange}) {
               onChange({item: next.item, moves: next.moves});
             }}
           >
-            <FitSprite name={o.mega} width={56} height={48} />
+            <FitSprite name={o.mega} shiny={mon.shiny} width={56} height={48} />
             <span style={{minWidth: 0, display: 'grid'}}>
               <strong>{megaName(o.mega)}</strong>
               <span class="dim">{o.item ? `Holds ${o.item}` : `Knows ${o.move}`}</span>
@@ -213,7 +213,7 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
         <div class="card panel">
           <div class="mon-identity">
             <div class="mon-portrait">
-              <Sprite name={mon.gmax && species.canGigantamax ? `${species.name}-Gmax` : species.name} scale={1.25} />
+              <Sprite name={mon.gmax && species.canGigantamax ? `${species.name}-Gmax` : species.name} shiny={mon.shiny} scale={1.25} />
             </div>
             <div style={{display: 'grid', gap: '8px', minWidth: 0}}>
               <span class="eyebrow">Slot {index + 1}</span>
@@ -242,7 +242,7 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
             </label>
           </div>
           <div class="btn-row">
-            <label class="switch"><input id={`shiny-${index}`} type="checkbox" checked={mon.shiny} onChange={e => onChange({shiny: e.currentTarget.checked})} /> Shiny</label>
+            <label class="switch"><input id={`shiny-${index}`} type="checkbox" checked={mon.shiny} onChange={e => onChange({shiny: e.currentTarget.checked})} /> Shiny <ShinyMark /></label>
             {species.canGigantamax && (
               <label class="switch"><input id={`gmax-${index}`} type="checkbox" checked={mon.gmax} onChange={e => onChange({gmax: e.currentTarget.checked})} /> Gigantamax ({species.canGigantamax})</label>
             )}
@@ -368,8 +368,8 @@ export function TeamEditor({team, onChange, onBack, onBattle}) {
         {team.mons.map((m, i) => (
           <button key={i} class="slot" role="tab" aria-pressed={i === slot} aria-selected={i === slot} onClick={() => setSlot(i)}>
             {problemSlots.has(i) && <span class="slot-warn" title="Has problems" />}
-            <FitSprite name={m.gmax ? `${m.species}-Gmax` : m.species} width={80} height={56} />
-            <span class="slot-name">{m.nickname || m.species}</span>
+            <FitSprite name={m.gmax ? `${m.species}-Gmax` : m.species} shiny={m.shiny} width={80} height={56} />
+            <span class="slot-name">{m.nickname || m.species}{m.shiny && <ShinyMark />}</span>
           </button>
         ))}
         {team.mons.length < TEAM_SIZE && (

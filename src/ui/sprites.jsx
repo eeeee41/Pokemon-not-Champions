@@ -38,29 +38,38 @@ function resolve(sheet, name, exact = true) {
 }
 
 /**
- * Where a Pokémon's sprite lives. For the back view, the forme's own art wins
- * over a related forme's back sprite (a Mega with no back sprite shows its
- * mirrored front, not the regular Pokémon's back).
+ * Where a Pokémon's sprite lives. The forme's own art always wins over a
+ * related forme's (a Mega with no back sprite shows its mirrored front, not
+ * the regular Pokémon's back). For a shiny, shiny art wins over the view: a
+ * mirrored shiny front beats a normal-colored back.
  */
-export function spriteInfo(name, back = false) {
-  const steps = back ?
-    [['back', true, false], ['front', true, true], ['back', false, false], ['front', false, true]] :
-    [['front', true, false], ['front', false, false]];
-  for (const [sheet, exact, flip] of steps) {
-    const id = resolve(sheet, name, exact);
-    if (id) return {sheet, rect: manifest[sheet].sprites[id], flip};
+export function spriteInfo(name, back = false, shiny = false) {
+  const shines = shiny ? [['back-shiny', 'front-shiny'], ['back', 'front']] : [['back', 'front']];
+  for (const exact of [true, false]) {
+    for (const [backSheet, frontSheet] of shines) {
+      const steps = back ? [[backSheet, false], [frontSheet, true]] : [[frontSheet, false]];
+      for (const [sheet, flip] of steps) {
+        const id = resolve(sheet, name, exact);
+        if (id) return {sheet, rect: manifest[sheet].sprites[id], flip};
+      }
+    }
   }
   return null;
 }
 
-export function spriteSize(name, back = false) {
-  const info = spriteInfo(name, back);
+export function spriteSize(name, back = false, shiny = false) {
+  const info = spriteInfo(name, back, shiny);
   return info ? {w: info.rect[2], h: info.rect[3]} : {w: 40, h: 40};
 }
 
+/** Is this a shiny, going by a battle "details" string like "Garchomp, L50, M, shiny"? */
+export function detailsShiny(details = '') {
+  return String(details).split(', ').includes('shiny');
+}
+
 /** Inline style that draws a sprite from its sheet; mask=true gives a mask in the sprite's shape. */
-export function spriteStyle(name, back = false, scale = 1, mask = false) {
-  const info = spriteInfo(name, back);
+export function spriteStyle(name, back = false, scale = 1, mask = false, shiny = false) {
+  const info = spriteInfo(name, back, shiny);
   if (!info) return null;
   const [x, y, w, h] = info.rect;
   const sheet = manifest[info.sheet];
@@ -82,8 +91,8 @@ export function spriteStyle(name, back = false, scale = 1, mask = false) {
 }
 
 /** A Pokémon sprite at a given scale. */
-export function Sprite({name, back = false, scale = 1, class: cls = '', style, title}) {
-  const drawn = spriteStyle(name, back, scale);
+export function Sprite({name, back = false, shiny = false, scale = 1, class: cls = '', style, title}) {
+  const drawn = spriteStyle(name, back, scale, false, shiny);
   if (!drawn) {
     return <span class={`sprite ${cls}`} style={{width: 40 * scale, height: 40 * scale, ...style}} role="img" aria-label={name} title={title} />;
   }
@@ -91,14 +100,19 @@ export function Sprite({name, back = false, scale = 1, class: cls = '', style, t
 }
 
 /** A sprite scaled to fit a box, bottom-aligned. */
-export function FitSprite({name, width = 56, height = 52, maxScale = 1, back = false, class: cls = '', title}) {
-  const {w, h} = spriteSize(name, back);
+export function FitSprite({name, width = 56, height = 52, maxScale = 1, back = false, shiny = false, class: cls = '', title}) {
+  const {w, h} = spriteSize(name, back, shiny);
   const scale = Math.min(maxScale, width / w, height / h);
   return (
     <span class={`sprite-box ${cls}`} style={{width: `${width}px`, height: `${height}px`}} title={title}>
-      <Sprite name={name} back={back} scale={scale} />
+      <Sprite name={name} back={back} shiny={shiny} scale={scale} />
     </span>
   );
+}
+
+/** The little star shown next to a shiny Pokémon's name. */
+export function ShinyMark() {
+  return <span class="shiny-mark" title="Shiny" aria-label="Shiny">★</span>;
 }
 
 export function ItemIcon({item, size = 24}) {

@@ -14,7 +14,7 @@ function TeamOption({team, selected, onSelect}) {
         {ok ? null : <span class="chip chip-bad">Needs fixes</span>}
       </span>
       <span class="mini-strip">
-        {team.mons.map((m, i) => <FitSprite key={i} name={m.gmax ? `${m.species}-Gmax` : m.species} width={40} height={34} />)}
+        {team.mons.map((m, i) => <FitSprite key={i} name={m.gmax ? `${m.species}-Gmax` : m.species} shiny={m.shiny} width={40} height={34} />)}
       </span>
     </button>
   );
