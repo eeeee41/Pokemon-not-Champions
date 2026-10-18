@@ -1,0 +1,130 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "presence": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name', 'state', 'at']) && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 16 && (newData.child('state').val() === 'idle' || newData.child('state').val() === 'searching' || newData.child('state').val() === 'hosting' || newData.child('state').val() === 'battling') && newData.child('at').isNumber()",
+        "name": {".validate": true},
+        "state": {".validate": true},
+        "at": {".validate": true},
+        "$other": {".validate": false}
+      }
+    },
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "wins": {".validate": "newData.isNumber() && newData.val() >= 0"},
+        "losses": {".validate": "newData.isNumber() && newData.val() >= 0"},
+        "match": {".validate": "newData.isString() && newData.val().length <= 32"},
+        "$other": {".validate": false}
+      }
+    },
+
+    "queue": {
+      "$mode": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!newData.exists() && data.child('uid').val() === auth.uid) || (newData.child('uid').val() === auth.uid && !newData.child('claimedBy').exists() && (!data.exists() || data.child('uid').val() === auth.uid || data.child('claimedBy').exists() || data.child('at').val() < now - 45000)) || (data.exists() && !data.child('claimedBy').exists() && data.child('uid').val() !== auth.uid && data.child('at').val() >= now - 45000 && newData.child('claimedBy').val() === auth.uid && newData.child('uid').val() === data.child('uid').val() && newData.child('match').val() === data.child('match').val() && newData.child('at').val() === data.child('at').val()))",
+        ".validate": "$mode.matches(/^(singles|doubles)-[a-z0-9]{1,16}$/) && newData.hasChildren(['uid', 'name', 'match', 'at'])",
+        "uid": {".validate": "newData.isString()"},
+        "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "match": {".validate": "newData.isString() && newData.val().length <= 32"},
+        "at": {".validate": "newData.isNumber() && newData.val() <= now + 60000"},
+        "claimedBy": {".validate": "newData.isString()"},
+        "claimedName": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "$other": {".validate": false}
+      }
+    },
+
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!newData.exists() && data.child('uid').val() === auth.uid) || (newData.child('uid').val() === auth.uid && !newData.child('claimedBy').exists() && (!data.exists() || data.child('uid').val() === auth.uid || data.child('claimedBy').exists() || data.child('at').val() < now - 120000)) || (data.exists() && !data.child('claimedBy').exists() && data.child('uid').val() !== auth.uid && data.child('at').val() >= now - 120000 && newData.child('claimedBy').val() === auth.uid && newData.child('uid').val() === data.child('uid').val() && newData.child('match').val() === data.child('match').val() && newData.child('mode').val() === data.child('mode').val() && newData.child('at').val() === data.child('at').val()))",
+        ".validate": "$code.matches(/^[A-HJ-NP-Z2-9]{5}$/) && newData.hasChildren(['uid', 'name', 'mode', 'match', 'at'])",
+        "uid": {".validate": "newData.isString()"},
+        "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "mode": {".validate": "newData.val() === 'singles' || newData.val() === 'doubles'"},
+        "match": {".validate": "newData.isString() && newData.val().length <= 32"},
+        "v": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "at": {".validate": "newData.isNumber() && newData.val() <= now + 60000"},
+        "claimedBy": {".validate": "newData.isString()"},
+        "claimedName": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "$other": {".validate": false}
+      }
+    },
+
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".read": "auth != null && auth.uid === $from",
+          ".write": "auth != null && (auth.uid === $from || (auth.uid === $to && !newData.exists()))",
+          ".validate": "newData.hasChildren(['name', 'mode', 'code', 'at'])",
+          "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+          "mode": {".validate": "newData.val() === 'singles' || newData.val() === 'doubles'"},
+          "code": {".validate": "newData.isString() && newData.val().matches(/^[A-HJ-NP-Z2-9]{5}$/)"},
+          "at": {".validate": "newData.isNumber()"},
+          "$other": {".validate": false}
+        }
+      }
+    },
+
+    "matches": {
+      "$id": {
+        ".read": "auth != null && (!data.exists() || data.child('p1/uid').val() === auth.uid || data.child('p2/uid').val() === auth.uid)",
+        ".write": "auth != null && !data.exists() && newData.child('p2/uid').val() === auth.uid && newData.child('p1/uid').val() !== auth.uid",
+        ".validate": "newData.hasChildren(['mode', 'seed', 'at', 'p1', 'p2']) && (data.exists() || (!newData.child('teams/p1').exists() && !newData.child('choices').exists() && !newData.child('result').exists() && !newData.child('online').exists()))",
+        "mode": {".validate": "newData.val() === 'singles' || newData.val() === 'doubles'"},
+        "seed": {".validate": "newData.isString() && newData.val().length <= 64"},
+        "v": {".validate": "newData.isString() && newData.val().length <= 16"},
+        "at": {".validate": "newData.isNumber()"},
+        "p1": {
+          "uid": {".validate": "newData.isString()"},
+          "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+          "$other": {".validate": false}
+        },
+        "p2": {
+          "uid": {".validate": "newData.isString()"},
+          "name": {".validate": "newData.isString() && newData.val().length <= 16"},
+          "$other": {".validate": false}
+        },
+        "teams": {
+          "$side": {
+            ".write": "auth != null && !data.exists() && ($side === 'p1' || $side === 'p2') && root.child('matches/' + $id + '/' + $side + '/uid').val() === auth.uid",
+            ".validate": "($side === 'p1' || $side === 'p2') && newData.isString() && newData.val().length <= 1000"
+          }
+        },
+        "choices": {
+          "$side": {
+            "$n": {
+              ".write": "auth != null && !data.exists() && ($side === 'p1' || $side === 'p2') && root.child('matches/' + $id + '/' + $side + '/uid').val() === auth.uid && !root.child('matches/' + $id + '/result').exists()",
+              ".validate": "newData.isString() && newData.val().length <= 120"
+            }
+          }
+        },
+        "online": {
+          "$side": {
+            ".write": "auth != null && ($side === 'p1' || $side === 'p2') && root.child('matches/' + $id + '/' + $side + '/uid').val() === auth.uid",
+            ".validate": "newData.isBoolean()"
+          }
+        },
+        "result": {
+          ".write": "auth != null && !data.exists() && (root.child('matches/' + $id + '/p1/uid').val() === auth.uid || root.child('matches/' + $id + '/p2/uid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['winner', 'reason', 'at'])",
+          "winner": {".validate": "newData.val() === 'p1' || newData.val() === 'p2' || newData.val() === 'tie'"},
+          "reason": {".validate": "newData.isString() && newData.val().length <= 16"},
+          "by": {".validate": "newData.val() === 'p1' || newData.val() === 'p2'"},
+          "at": {".validate": "newData.isNumber()"},
+          "$other": {".validate": false}
+        },
+        "$other": {".validate": false}
+      }
+    }
+  }
+}

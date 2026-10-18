@@ -6,6 +6,7 @@
 //   dist/assets/*         sprite sheets
 //
 // Usage: node scripts/build.mjs [--watch] [--dev]
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -16,6 +17,26 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const watch = process.argv.includes('--watch');
 const dev = process.argv.includes('--dev') || watch;
+
+// Online players are only matched with others running the same battle engine
+// (src/online/version.js). This hash changes whenever anything that affects
+// how a battle plays out changes.
+function battleVersion() {
+  const hash = crypto.createHash('sha256');
+  const files = [
+    ...fs.readdirSync(path.join(root, 'src', 'engine')).map(f => `src/engine/${f}`),
+    'src/online/lobby.js',
+    'src/online/online-game.js',
+    'src/generated/learnsets.json',
+    'scripts/slim-sim.mjs',
+  ].sort();
+  for (const file of files) hash.update(`${file}\n`).update(fs.readFileSync(path.join(root, file)));
+  for (const pkg of ['@pkmn/sim', '@pkmn/data', '@pkmn/dex']) {
+    const json = path.join(root, 'node_modules', pkg, 'package.json');
+    if (fs.existsSync(json)) hash.update(`${pkg}@${JSON.parse(fs.readFileSync(json, 'utf8')).version}\n`);
+  }
+  return hash.digest('hex').slice(0, 10);
+}
 
 function copyAssets() {
   const from = path.join(root, 'public');
@@ -76,7 +97,10 @@ const options = {
   jsx: 'automatic',
   jsxImportSource: 'preact',
   loader: {'.json': 'json'},
-  define: {'process.env.NODE_ENV': dev ? '"development"' : '"production"'},
+  define: {
+    'process.env.NODE_ENV': dev ? '"development"' : '"production"',
+    __BATTLE_VERSION__: JSON.stringify(battleVersion()),
+  },
   metafile: true,
   logLevel: 'info',
   plugins: [slimSim, {

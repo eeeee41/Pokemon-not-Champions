@@ -17,10 +17,13 @@
     "@pkmn/protocol": "^0.7.3",
     "@pkmn/sim": "^0.10.11",
     "@pkmn/view": "^0.7.3",
+    "firebase": "^12.19.0",
     "preact": "^10.29.8"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "targaryen": "^3.1.0",
+    "ws": "^8.22.0"
   },
   "engines": {
     "node": ">=20"
