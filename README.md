@@ -7,7 +7,8 @@ Pokémon battles between real players, on Pokémon Champions stat rules.
 - **Mega Evolution, Z-Moves, Dynamax / Gigantamax and Terastallization**, each once per battle
 - **Champions stats**: level 50, IVs 31, 66 stat points per Pokémon (max 32 in one stat), 25 natures
 - **Team builder** with legal-move checking, Showdown import/export, and three starter teams
-- **Local two-player battles** on one device today; online Quick Match is the next milestone
+- **Online battles**: Quick Match, private battle codes, challenges, turn timer, rejoining, records
+- **Local two-player battles** on one device, which work anywhere (even offline)
 
 The battle engine is [Pokémon Showdown's simulator](https://github.com/smogon/pokemon-showdown) (via [`@pkmn/sim`](https://github.com/pkmn/ps)), so mechanics match Showdown.
 
@@ -17,7 +18,7 @@ Needs Node 20+.
 
 ```sh
 npm install
-npm test          # engine tests: stats, learnsets, teams, 70 full random battles
+npm test          # engine, save codes, database rules, online play (in memory and via the real Firebase SDK)
 npm run build     # writes dist/
 npx serve dist    # or any static server, then open the printed URL
 ```
@@ -52,7 +53,8 @@ src/
     choices.js       targeting rules, random legal choices (tests, timeouts)
     samples.js       starter teams
   client/tracker.js  what one player knows (@pkmn/client) + battle text (@pkmn/view)
-  ui/                Preact screens: home, teams, editor, setup, battle
+  online/            online play: Firebase backend, lobby, lockstep games, version stamp
+  ui/                Preact screens: home, teams, editor, setup, online, battle
   generated/         learnsets.json, sprites.json (built by scripts/)
 public/assets/       sprite sheets
 scripts/
@@ -62,31 +64,41 @@ scripts/
 test/                node --test suites
 ```
 
-## How online play will work
+## How online play works
 
 `Match` is deterministic: two copies created with the same seed and teams, fed the same choices in
-the same order, produce identical battles (there's a test for this). The online version uses that:
+the same order, produce identical battles. Online play (`src/online/`) uses that, over Firebase
+Realtime Database with anonymous sign-in:
 
-1. Players sign in (Firebase Auth) and queue for Singles or Doubles (Realtime Database).
-2. A match record holds the seed and both teams.
-3. Each turn, each player writes their choice; both browsers apply both choices to their own `Match`.
-4. Each browser shows only its own player's view of the battle (`match.views.p1` / `p2`).
+1. `lobby.js`: presence, Quick Match (one waiting spot per mode, claimed in a transaction),
+   private rooms with 5-letter codes, and challenges.
+2. A match record holds the seed and both teams (as save codes).
+3. `online-game.js`: each player writes only their own choices; both browsers apply both lists to
+   their own `Match`. Reloading rebuilds the battle from the saved choices, which is how rejoining
+   works. 90-second turn timer, claim-a-win after 2½ minutes, forfeits, records.
+4. `database.rules.json` makes each player able to write only their own team, choices and record.
 
-A determined player could read hidden information from their own browser in this lockstep model.
-If that becomes a problem, the same `Match` class can run inside a Cloud Function instead, sending
-each player only their own view.
+Players are only matched with others on the same battle-engine version (`version.js`, stamped
+by the build). A determined player could still read hidden information from their own browser in
+this lockstep model; the same `Match` class could run in a Cloud Function instead.
 
-## Deploying to Firebase Hosting
+`test/support/fake-firebase.mjs` is a small local stand-in for Firebase that the real SDK can talk
+to; `node test/support/serve-fake-firebase.mjs 9799` runs it for trying online play in two
+browser windows (see the comment at the top of that file).
 
-1. Create a project at [console.firebase.google.com](https://console.firebase.google.com).
-2. `npm install -g firebase-tools`, then `firebase login`.
-3. `firebase use --add` and pick the project.
-4. `npm run build && firebase deploy --only hosting`.
+## Deploying to Firebase
 
-To deploy on every push to `main` with GitHub Actions, add two things to the GitHub repo:
-the secret `FIREBASE_SERVICE_ACCOUNT` (a service-account JSON key, from
-`firebase init hosting:github` or the Firebase console) and the variable `FIREBASE_PROJECT_ID`.
-The workflow is `.github/workflows/deploy.yml`.
+Every push to `main` runs `.github/workflows/deploy.yml`: tests, build, then it publishes the
+database rules and the site. It needs, in the GitHub repo:
+
+- the secret `FIREBASE_SERVICE_ACCOUNT`: a service-account JSON key with the roles Firebase Hosting
+  Admin, Firebase Authentication Admin, Firebase Realtime Database Admin, API Keys Viewer and
+  Cloud Run Viewer
+- the variable `FIREBASE_PROJECT_ID`
+
+In the Firebase project: register a web app with Hosting, enable Anonymous sign-in, and create the
+Realtime Database. The site reads its Firebase settings from Hosting's `/__/firebase/init.json`, so
+nothing needs to be pasted into the code.
 
 ## Credits
 
