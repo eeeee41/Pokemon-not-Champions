@@ -8,6 +8,7 @@ Pokémon battles between real players, on Pokémon Champions stat rules.
 - **Champions stats**: level 50, IVs 31, 66 stat points per Pokémon (max 32 in one stat), 25 natures
 - **Team builder** with legal-move checking, Showdown import/export, and three starter teams
 - **Online battles**: Quick Match, private battle codes, challenges, turn timer, rejoining, records
+- **Rivals**: 21 rivals from every generation (Blue to Taunie) in Singles vs the computer, on Normal, Hard or Champion
 - **Local two-player battles** on one device, which work anywhere (even offline)
 
 The battle engine is [Pokémon Showdown's simulator](https://github.com/smogon/pokemon-showdown) (via [`@pkmn/sim`](https://github.com/pkmn/ps)), so mechanics match Showdown.
@@ -51,6 +52,8 @@ src/
     team.js          team model, validation, Showdown import/export
     match.js         one battle: seeds, choices, per-player protocol streams
     choices.js       targeting rules, random legal choices (tests, timeouts)
+    bot.js           the computer opponent: plays turns forward with the simulator
+    rivals.js        the rivals and their teams
     samples.js       starter teams
   client/tracker.js  what one player knows (@pkmn/client) + battle text (@pkmn/view)
   online/            online play: Firebase backend, lobby, lockstep games, version stamp
@@ -63,6 +66,17 @@ scripts/
   build-sprites.py   regenerates sprite sheets (npm run sprites; needs git + Pillow)
 test/                node --test suites
 ```
+
+## How the computer opponents think
+
+`src/engine/bot.js` copies the battle (the simulator can snapshot itself) and plays possible turns
+forward with fresh luck each time. Hard and Champion try every option they have, including Mega,
+Tera, Z-Move and Dynamax variants, against every reply the player could make. They score where
+each line leaves them (HP, faints, status, stat changes, hazards, who threatens whom and who's
+faster, and gimmicks still in hand), then pick the option that holds up best if the player
+answers well. Champion plays each line out more times and re-checks its best options; Hard
+occasionally takes its second choice; Normal just picks strong moves. The bot decides from a
+snapshot taken before the player's choice, so it never sees it.
 
 ## How online play works
 

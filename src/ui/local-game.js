@@ -11,7 +11,7 @@ export function formatEntries(text) {
   const out = [];
   for (const raw of text.split('\n')) {
     if (!raw.trim()) continue;
-    if (/\(fallen\d started on/.test(raw)) continue; // internal counter for Supreme Overlord
+    if (/fallen\d/.test(raw)) continue; // internal counter for Supreme Overlord
     let line = raw;
     // ||exact||percent|| HP markup: show the percentage.
     line = line.replace(/\|\|([^|]*)\|\|([^|]*)\|\|/g, (_, exact, pct) => pct);

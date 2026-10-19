@@ -8,6 +8,9 @@ import {TeamEditor} from './TeamEditor.jsx';
 import {SetupPage} from './Setup.jsx';
 import {BattleScreen} from './Battle.jsx';
 import {OnlinePage, InviteBanner, onlineTeam} from './Online.jsx';
+import {RivalsPage} from './Rivals.jsx';
+import {BotGame} from './bot-game.js';
+import {rivalTeams} from '../engine/rivals.js';
 import {LocalGame} from './local-game.js';
 import {OnlineSession} from './online-session.js';
 import {OnlineGame} from '../online/online-game.js';
@@ -88,6 +91,25 @@ export function App() {
     setGame(null);
   };
 
+  const startBot = (rival, level, team) => {
+    if (game?.online) closeGame();
+    setSettings(prev => ({...prev, rivalLevel: level, rivalTeam: team.id}));
+    const next = new BotGame({rival, level, team, rivalTeam: rivalTeams()[rival.id]});
+    // Remember each rival beaten, per difficulty.
+    let counted = false;
+    next.subscribe(() => {
+      if (counted || next.phase.type !== 'over' || next.phase.winner !== 0) return;
+      counted = true;
+      setSettings(prev => {
+        const wins = {...(prev.rivalWins || {})};
+        wins[rival.id] = [...new Set([...(wins[rival.id] || []), level])];
+        return {...prev, rivalWins: wins};
+      });
+    });
+    setGame(next);
+    go({name: 'battle'});
+  };
+
   const startGame = ({mode, players, hideChoices, names}) => {
     // An online battle left open carries on without this page; it can be rejoined.
     if (game?.online) closeGame();
@@ -114,6 +136,8 @@ export function App() {
     ) : <TeamsPage teams={teams} setTeams={setTeams} onEdit={id => go({name: 'editor', id})} />;
   } else if (route.name === 'setup') {
     page = <SetupPage key={JSON.stringify(settings.lastTeams)} teams={teams} settings={settings} onStart={startGame} onTeams={() => go({name: 'teams'})} />;
+  } else if (route.name === 'rivals') {
+    page = <RivalsPage teams={teams} settings={settings} setSettings={setSettings} onBattle={startBot} onTeams={() => go({name: 'teams'})} />;
   } else if (route.name === 'online') {
     page = (
       <OnlinePage online={online} session={session} teams={teams} settings={settings} setSettings={setSettings}
@@ -135,13 +159,20 @@ export function App() {
         speed={settings.speed}
         onSpeed={speed => setSettings({...settings, speed})}
         onLeave={() => {
-          const wasOnline = !!game.online;
+          const back = game.online ? 'online' : game.bot ? 'rivals' : 'setup';
+          if (game.bot) game.dispose();
           closeGame();
-          go({name: wasOnline ? 'online' : 'setup'});
+          go({name: back});
         }}
         onRematch={() => {
           if (game.online) {
             session.challenge(opponent, game.mode, myCode);
+            return;
+          }
+          if (game.bot) {
+            game.dispose();
+            startBot(game.bot.rival, game.bot.level, game.players[0].team);
+            window.scrollTo(0, 0);
             return;
           }
           setGame(new LocalGame({mode: game.mode, players: game.players, hideChoices: game.hideChoices}));
@@ -155,7 +186,7 @@ export function App() {
     );
   } else {
     page = (
-      <HomePage readyTeams={readyTeams} onTeams={() => go({name: 'teams'})}
+      <HomePage readyTeams={readyTeams} onTeams={() => go({name: 'teams'})} onRivals={() => go({name: 'rivals'})}
         onOnline={mode => {
           if (mode) setSettings({...settings, onlineMode: mode});
           go({name: 'online'});
@@ -175,8 +206,10 @@ export function App() {
   const team = onlineTeam(teams, settings);
 
   const section = route.name === 'teams' || route.name === 'editor' ? 'teams' : route.name === 'home' ? 'home' :
-    route.name === 'online' || (route.name === 'battle' && game?.online) ? 'online' : 'play';
-  const localGame = game && !game.online ? game : null;
+    route.name === 'online' || (route.name === 'battle' && game?.online) ? 'online' :
+    route.name === 'rivals' || (route.name === 'battle' && game?.bot) ? 'rivals' : 'play';
+  const localGame = game && !game.online && !game.bot ? game : null;
+  const botGame = game?.bot ? game : null;
   const onlineGame = game?.online ? game : null;
   return (
     <div class="app">
@@ -190,6 +223,9 @@ export function App() {
           <nav class="nav" aria-label="Main">
             <button aria-current={section === 'play' ? 'page' : undefined} onClick={() => go(localGame ? {name: 'battle'} : {name: 'setup'})}>
               {localGame ? 'Battle' : 'Play'}
+            </button>
+            <button aria-current={section === 'rivals' ? 'page' : undefined} onClick={() => go(botGame ? {name: 'battle'} : {name: 'rivals'})}>
+              Rivals
             </button>
             <button aria-current={section === 'online' ? 'page' : undefined} onClick={() => go(onlineGame ? {name: 'battle'} : {name: 'online'})}>
               Online{online.invites.length > 0 && <span class="nav-badge" aria-label={`${online.invites.length} challenge`}>{online.invites.length}</span>}

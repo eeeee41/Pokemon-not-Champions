@@ -4,7 +4,7 @@ import {Sprite} from './sprites.jsx';
 
 const LINEUP = ['Garchomp-Mega', 'Charizard-Gmax', 'Kingambit', 'Flutter Mane', 'Clefable-Mega'];
 
-export function HomePage({onPlay, onOnline, onTeams, readyTeams}) {
+export function HomePage({onPlay, onOnline, onRivals, onTeams, readyTeams}) {
   return (
     <div class="home">
       <section class="hero">
@@ -14,7 +14,8 @@ export function HomePage({onPlay, onOnline, onTeams, readyTeams}) {
           <p>Every Pokémon from every generation, with Mega Evolution, Z-Moves, Gigantamax and Terastallization, on Pokémon Champions stat rules.</p>
           <div class="btn-row">
             <button class="btn btn-primary btn-lg" onClick={() => onOnline()}>Battle online</button>
-            <button class="btn btn-lg" onClick={onTeams}>Build a team</button>
+            <button class="btn btn-lg" onClick={onRivals}>Fight the rivals</button>
+            <button class="btn btn-lg btn-ghost" onClick={onTeams}>Build a team</button>
           </div>
         </div>
         <div class="hero-lineup" aria-hidden="true">
@@ -54,6 +55,16 @@ export function HomePage({onPlay, onOnline, onTeams, readyTeams}) {
             </div>
           </article>
         ))}
+      </section>
+
+      <section class="card online-note rivals-note">
+        <span class="online-dot live" aria-hidden="true" />
+        <div>
+          <strong>21 rivals, three difficulties.</strong>
+          <span class="muted"> Blue, Silver, May, Barry, Hop, Nemona, Kieran, Taunie and more, with the teams from their toughest
+            battles. On Champion, they read your moves and save their Mega or Tera for the right moment.</span>
+        </div>
+        <button class="btn" onClick={onRivals}>See the rivals</button>
       </section>
 
       <section class="card online-note">

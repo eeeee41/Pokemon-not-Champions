@@ -41,6 +41,9 @@ export const DEFAULT_SETTINGS = {
   onlineName: '',
   onlineMode: 'singles',
   onlineTeam: null,
+  rivalLevel: 'hard',
+  rivalTeam: null,
+  rivalWins: {},
 };
 
 export function loadSettings() {

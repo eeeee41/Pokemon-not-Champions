@@ -727,15 +727,24 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
     stadium = request?.teamPreview ? null : <Stadium tracker={game.trackers[i]} perspective={i === 0 ? 'p1' : 'p2'} mode={mode} exactOwn />;
     deck = request?.teamPreview ? <TeamPreview key={`tp${i}`} game={game} player={i} /> : <CommandDeck key={`${i}-${request?.rqid}`} game={game} player={i} />;
     log = game.logs[i];
-    if (!online) logTitle = `${names[i]}'s log`;
+    if (!online && !game.bot) logTitle = `${names[i]}'s log`;
   } else {
     const started = game.stage.battle.turn > 0 || game.stage.battle.p1.active.some(Boolean);
     // Online, the stage replays the battle as this player sees it (their own HP exact).
     stadium = started ? (
-      <Stadium tracker={game.stage} perspective={game.stagePerspective || 'p1'} mode={mode} exactOwn={online} fx={fx}
+      <Stadium tracker={game.stage} perspective={game.stagePerspective || 'p1'} mode={mode} exactOwn={online || !!game.bot} fx={fx}
         message={phase.type === 'playback' ? game.lastText : ''} />
     ) : null;
-    if (phase.type === 'loading') {
+    if (phase.type === 'thinking') {
+      deck = (
+        <div class="card deck">
+          <div class="waiting" role="status">
+            <span class="spinner" aria-hidden="true" />
+            <span class="grow"><strong>{names[phase.player]} is thinking…</strong></span>
+          </div>
+        </div>
+      );
+    } else if (phase.type === 'loading') {
       deck = (
         <div class="card pass-screen" role="status">
           <span class="spinner big" aria-hidden="true" />
@@ -824,10 +833,11 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
       deck = (
         <div class="card result">
           <p class="trophy">Battle over · {turn} {turn === 1 ? 'turn' : 'turns'}</p>
-          <h2>{w === null || w === undefined ? "It's a draw" : `${names[w]} wins!`}</h2>
+          <h2>{w === null || w === undefined ? "It's a draw" : game.bot && w === 0 ? 'You win!' : `${names[w]} wins!`}</h2>
+          {game.bot && w === 0 && <p class="muted">You beat {names[1]} on {game.bot.levelLabel}.</p>}
           <div class="btn-row" style={{justifyContent: 'center'}}>
             <button class="btn btn-primary" onClick={onRematch}>Rematch</button>
-            <button class="btn" onClick={onLeave}>New battle</button>
+            <button class="btn" onClick={onLeave}>{game.bot ? 'Back to rivals' : 'New battle'}</button>
           </div>
         </div>
       );

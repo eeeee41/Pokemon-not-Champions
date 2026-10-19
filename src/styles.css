@@ -740,6 +740,28 @@ button.preview-mon:hover { border-color: var(--ink-3); }
   .room-code { font-size: 2.1rem; }
 }
 
+/* ---------- Rivals ---------- */
+.rivals { display: grid; gap: 16px; }
+.seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.team-options-row { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); max-height: none; }
+.rival-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+.rival-card { padding: 14px; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; align-items: center; }
+.rival-card.beaten { border-color: var(--gold); }
+.rival-ace { width: 96px; height: 86px; display: grid; place-items: end center; background: var(--surface-2); border-radius: 8px; }
+.rival-info { display: grid; gap: 3px; min-width: 0; }
+.rival-info h3 { font-size: 1.2rem; }
+.rival-game { font-size: .82rem; }
+.rival-pips { display: flex; gap: 4px; }
+.rival-pip {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  font-size: .7rem; font-weight: 800; background: var(--surface-2); color: var(--ink-3);
+}
+.rival-pip.on { background: var(--gold); color: var(--on-gold); }
+.rival-team { grid-column: 1 / -1; display: flex; align-items: flex-end; height: 36px; background: var(--surface-2); border-radius: 8px; padding: 0 4px; }
+.rival-card > .btn { grid-column: 1 / -1; }
+.rivals-note { grid-template-columns: auto minmax(0, 1fr) auto; }
+@media (max-width: 560px) { .rivals-note { grid-template-columns: auto minmax(0, 1fr); } .rivals-note > .btn { grid-column: 1 / -1; } }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1000px) {
   .battle { grid-template-columns: minmax(0, 1fr); }
