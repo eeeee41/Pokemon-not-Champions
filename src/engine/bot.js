@@ -196,6 +196,23 @@ export function evaluate(b, me) {
 
 // ---------- choosing ----------
 
+const yieldToPage = () => new Promise(r => setTimeout(r, 0));
+
+/** Average score of one turn: my choice vs theirs, over `samples` rolls of luck. */
+function playTurn(json, me, mine, theirs, samples, rng) {
+  let total = 0;
+  let n = 0;
+  for (let k = 0; k < samples; k++) {
+    const b = restore(json, rng);
+    const ok1 = b.choose(SIDE_IDS[me], mine);
+    const ok2 = theirs === null ? true : b.choose(SIDE_IDS[1 - me], theirs);
+    if (!ok1 || !ok2) return null;
+    total += evaluate(b, me);
+    n++;
+  }
+  return total / n;
+}
+
 function softmin(values, temperature) {
   const lo = Math.min(...values);
   const w = values.map(v => Math.exp(-(v - lo) / temperature));
