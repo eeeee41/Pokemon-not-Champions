@@ -24,14 +24,27 @@ jobs:
 
       - name: Publish database rules
         if: github.event_name != 'pull_request' && vars.FIREBASE_PROJECT_ID != ''
+        # The site still deploys if this fails; the error shows as notes on the run.
+        continue-on-error: true
         env:
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
         run: |
           key="$RUNNER_TEMP/service-account.json"
+          log="$RUNNER_TEMP/rules.log"
           trap 'rm -f "$key"' EXIT
           printf '%s' "$SERVICE_ACCOUNT" > "$key"
-          GOOGLE_APPLICATION_CREDENTIALS="$key" npx --yes firebase-tools@15 deploy --only database --project "$PROJECT" --non-interactive
+          set +e
+          GOOGLE_APPLICATION_CREDENTIALS="$key" npx --yes firebase-tools@15 deploy --only database --project "$PROJECT" --non-interactive > "$log" 2>&1
+          status=$?
+          cat "$log"
+          if [ "$status" -ne 0 ]; then
+            grep -v '^\s*$' "$log" | tail -n 9 | while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              echo "::error title=Publish database rules::${line}"
+            done
+            exit "$status"
+          fi
 
       - name: Deploy the site to Firebase Hosting
         if: github.event_name != 'pull_request' && vars.FIREBASE_PROJECT_ID != ''
