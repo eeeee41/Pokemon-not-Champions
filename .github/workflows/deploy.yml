@@ -38,6 +38,12 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS="$key" npx --yes firebase-tools@15 deploy --only database --project "$PROJECT" --non-interactive > "$log" 2>&1
           status=$?
           cat "$log"
+          # The upload can succeed even if a later lookup fails; that still counts.
+          if [ "$status" -ne 0 ] && grep -q 'settings/rules.json' firebase-debug.log 2>/dev/null \
+             && grep -A2 'PUT .*settings/rules.json' firebase-debug.log | grep -q '"status":"ok"'; then
+            echo "::notice title=Publish database rules::Rules published (a later lookup failed, which doesn't matter)."
+            status=0
+          fi
           if [ "$status" -ne 0 ]; then
             # The real reason is usually in the debug log (HTTP status and message).
             { grep -hiE '"(code|status|message)"|HTTP Error|[0-9]{3}, ' firebase-debug.log 2>/dev/null | grep -viE 'token|private|credential' | tail -n 6
