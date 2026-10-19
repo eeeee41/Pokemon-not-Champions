@@ -1,5 +1,5 @@
-// Saved teams and settings live in this browser (localStorage). When the site
-// moves to Firebase, signed-in players' teams will sync to their account.
+// Saved teams and settings live in this browser (localStorage). Online play
+// only sends the team you battle with (as a save code), never the rest.
 import {sampleTeams} from '../engine/samples.js';
 
 const TEAMS_KEY = 'champions-pvp.teams.v1';
@@ -38,6 +38,9 @@ export const DEFAULT_SETTINGS = {
   mode: 'singles',
   hideChoices: true,
   speed: 'normal',
+  onlineName: '',
+  onlineMode: 'singles',
+  onlineTeam: null,
 };
 
 export function loadSettings() {

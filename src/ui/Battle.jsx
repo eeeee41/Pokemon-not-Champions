@@ -4,6 +4,7 @@ import {dex, toID, megaOptions, megaName, itemGimmick} from '../engine/dex.js';
 import {targetOptions} from '../engine/choices.js';
 import {MODES, STAT_LABELS} from '../engine/constants.js';
 import {FitSprite, Sprite, TypeBadge, ShinyMark, spriteStyle, detailsShiny} from './sprites.jsx';
+import {clock, useTicker} from './Online.jsx';
 
 // ---------- helpers ----------
 
@@ -612,13 +613,61 @@ function Log({entries, title}) {
 
 const SPEEDS = {slow: 1.5, normal: 1, fast: 0.45};
 
-export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematch}) {
+// How an online battle ended, said about the player who didn't win.
+const END_REASONS = {
+  forfeit: loser => `${loser} forfeited.`,
+  timeout: loser => `${loser} ran out of time.`,
+  illegal: loser => `${loser}'s team wasn't legal for this battle.`,
+  noshow: () => "A player didn't show up in time, so the battle never started.",
+  sync: () => 'The two screens got out of sync, so nobody wins. Refreshing the page usually fixes this.',
+};
+
+/** The end of an online battle: who won, why, and a rematch. */
+function OnlineResult({game, names, turn, phase, rematch, onRematch, onAcceptRematch, onDeclineRematch, onCancelRematch, onLeave}) {
+  const w = phase.winner;
+  const reason = phase.reason || 'battle';
+  const opp = names[game.opp];
+  let title;
+  if (w === null || w === undefined) title = reason === 'noshow' ? "The battle didn't start" : reason === 'sync' ? 'No winner' : "It's a draw";
+  else title = w === game.me ? 'You win!' : `${names[w]} wins`;
+  const why = END_REASONS[reason]?.(w === null || w === undefined ? '' : names[1 - w]);
+  return (
+    <div class="card result">
+      <p class="trophy">{game.match ? `Battle over · ${turn} ${turn === 1 ? 'turn' : 'turns'}` : 'Battle over'}</p>
+      <h2>{title}</h2>
+      {why && <p class="muted">{why}</p>}
+      {rematch?.invite ? (
+        <div class="waiting" role="status">
+          <span class="grow"><strong>{opp}</strong> wants a rematch!</span>
+          <button class="btn btn-primary btn-sm" disabled={rematch.busy} onClick={onAcceptRematch}>Accept</button>
+          <button class="btn btn-ghost btn-sm" onClick={onDeclineRematch}>No thanks</button>
+        </div>
+      ) : rematch?.waiting ? (
+        <div class="waiting" role="status">
+          <span class="spinner" aria-hidden="true" />
+          <span class="grow">Waiting for {opp} to accept…</span>
+          <button class="btn btn-sm" onClick={onCancelRematch}>Cancel</button>
+        </div>
+      ) : rematch?.notice ? <p class="muted">{rematch.notice}</p> : null}
+      <div class="btn-row" style={{justifyContent: 'center'}}>
+        {rematch?.available && !rematch.waiting && !rematch.invite && (
+          <button class="btn btn-primary" disabled={rematch.busy} onClick={onRematch}>Ask for a rematch</button>
+        )}
+        <button class="btn" onClick={onLeave}>Back to lobby</button>
+      </div>
+    </div>
+  );
+}
+
+export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematch, rematch, onAcceptRematch, onDeclineRematch, onCancelRematch}) {
   const [, force] = useReducer(x => x + 1, 0);
   const [fx, setFx] = useState({});
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmForfeit, setConfirmForfeit] = useState(false);
   useEffect(() => game.subscribe(force), [game]);
   const phase = game.phase;
+  // Online clocks count down once a second.
+  useTicker(!!game.online && (phase.type === 'choose' || phase.type === 'waiting'));
 
   useEffect(() => {
     if (phase.type !== 'playback') return undefined;
@@ -659,9 +708,14 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
     };
   }, [phase, game, speed]);
 
-  const names = game.players.map(p => p.name);
+  const online = !!game.online;
+  // An online battle knows its players' names before their teams arrive.
+  const names = game.players ? game.players.map(p => p.name) :
+    [game.header?.p1?.name || 'Player 1', game.header?.p2?.name || 'Player 2'];
   const turn = game.stage.battle.turn;
-  const modeLabel = MODES[game.mode].label;
+  const mode = game.mode || 'singles';
+  const modeLabel = MODES[mode].label;
+  const timeLeft = online && game.deadline ? game.timeLeft() : null;
 
   let stadium;
   let deck = null;
@@ -670,14 +724,73 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
   if (phase.type === 'choose') {
     const i = phase.player;
     const request = game.match.requests[i];
-    stadium = request?.teamPreview ? null : <Stadium tracker={game.trackers[i]} perspective={i === 0 ? 'p1' : 'p2'} mode={game.mode} exactOwn />;
+    stadium = request?.teamPreview ? null : <Stadium tracker={game.trackers[i]} perspective={i === 0 ? 'p1' : 'p2'} mode={mode} exactOwn />;
     deck = request?.teamPreview ? <TeamPreview key={`tp${i}`} game={game} player={i} /> : <CommandDeck key={`${i}-${request?.rqid}`} game={game} player={i} />;
     log = game.logs[i];
-    logTitle = `${names[i]}'s log`;
+    if (!online) logTitle = `${names[i]}'s log`;
   } else {
     const started = game.stage.battle.turn > 0 || game.stage.battle.p1.active.some(Boolean);
-    stadium = started ? <Stadium tracker={game.stage} perspective="p1" mode={game.mode} exactOwn={false} fx={fx} message={phase.type === 'playback' ? game.lastText : ''} /> : null;
-    if (phase.type === 'pass') {
+    // Online, the stage replays the battle as this player sees it (their own HP exact).
+    stadium = started ? (
+      <Stadium tracker={game.stage} perspective={game.stagePerspective || 'p1'} mode={mode} exactOwn={online} fx={fx}
+        message={phase.type === 'playback' ? game.lastText : ''} />
+    ) : null;
+    if (phase.type === 'loading') {
+      deck = (
+        <div class="card pass-screen" role="status">
+          <span class="spinner big" aria-hidden="true" />
+          <p class="muted">{phase.text}</p>
+          <button class="btn btn-ghost" onClick={onLeave}>Back to lobby</button>
+        </div>
+      );
+    } else if (phase.type === 'waiting') {
+      const preview = game.match.requests[game.me]?.teamPreview;
+      const opp = names[game.opp];
+      let claimLine = null;
+      if (game.canClaimWin()) {
+        claimLine = (
+          <>
+            <span class="muted">{opp} hasn't moved in a long while.</span>
+            <button class="btn btn-primary" onClick={() => game.claimWin()}>Claim the win</button>
+          </>
+        );
+      } else if (!game.opponentOnline || (timeLeft !== null && timeLeft < 60000)) {
+        claimLine = <span class="muted num">If {opp} doesn't move, you can claim the win in {clock(timeLeft)}.</span>;
+      }
+      deck = (
+        <div class="card deck">
+          <div class="waiting" role="status">
+            <span class="spinner" aria-hidden="true" />
+            <span class="grow">
+              <strong>Waiting for {opp}…</strong>{' '}
+              <span class="muted">{preview ? 'They\'re choosing their lead.' : 'Your choice is locked in.'}</span>
+            </span>
+          </div>
+          {claimLine && <div class="claim-line">{claimLine}</div>}
+        </div>
+      );
+    } else if (phase.type === 'error') {
+      deck = (
+        <div class="card result" role="alert">
+          <p class="trophy">Something went wrong</p>
+          <h2>This battle can't go on here</h2>
+          <p class="muted">{phase.text}</p>
+          <div class="btn-row" style={{justifyContent: 'center'}}>
+            {phase.kind === 'outdated' ? (
+              <button class="btn btn-danger" onClick={() => game.forfeit(game.me)}>Forfeit this battle</button>
+            ) : (
+              <button class="btn btn-primary" onClick={() => game.reload()}>Try again</button>
+            )}
+            <button class="btn" onClick={onLeave}>Back to lobby</button>
+          </div>
+        </div>
+      );
+    } else if (phase.type === 'over' && online) {
+      deck = (
+        <OnlineResult game={game} names={names} turn={turn} phase={phase} rematch={rematch} onRematch={onRematch}
+          onAcceptRematch={onAcceptRematch} onDeclineRematch={onDeclineRematch} onCancelRematch={onCancelRematch} onLeave={onLeave} />
+      );
+    } else if (phase.type === 'pass') {
       const name = names[phase.player];
       const other = names[1 - phase.player];
       const preview = game.match.requests[phase.player]?.teamPreview;
@@ -721,19 +834,28 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
     }
   }
 
-  const chooser = phase.type === 'choose' ? phase.player : null;
+  // Who can forfeit: locally, whoever is choosing; online, you, until the battle ends.
+  const live = game.match && !game.match.ended && !game.result && phase.type !== 'over' && phase.type !== 'error';
+  const chooser = online ? (live ? game.me : null) : phase.type === 'choose' ? phase.player : null;
+  const myClock = online && phase.type === 'choose' && timeLeft !== null;
+  const you = i => (online && i === game.me ? ' (you)' : '');
   return (
     <section class="battle">
       <div class="battle-main">
         <div class="battle-bar">
           <div class="who">
             <span class="turn-badge">{modeLabel}{turn ? ` · Turn ${turn}` : ''}</span>
-            <span>{names[0]} <span class="dim">vs</span> {names[1]}</span>
+            <span>{names[0]}{you(0)} <span class="dim">vs</span> {names[1]}{you(1)}</span>
+            {myClock && (
+              <span class={`chip timer-chip${timeLeft < 20000 ? ' low' : ''}`} title="When your time runs out, a move is picked for you.">
+                Your time {clock(timeLeft)}
+              </span>
+            )}
           </div>
           <div class="btn-row">
-            {chooser !== null && !game.match.ended && (confirmForfeit ? (
+            {chooser !== null && !game.match?.ended && (confirmForfeit ? (
               <span class="confirm-inline">
-                <span>Forfeit as {names[chooser]}?</span>
+                <span>{online ? 'Forfeit this battle?' : `Forfeit as ${names[chooser]}?`}</span>
                 <button class="btn btn-sm btn-danger" onClick={() => {
                   setConfirmForfeit(false);
                   game.forfeit(chooser);
@@ -741,15 +863,23 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
                 <button class="btn btn-sm btn-ghost" onClick={() => setConfirmForfeit(false)}>Keep playing</button>
               </span>
             ) : <button class="btn btn-sm btn-ghost" onClick={() => setConfirmForfeit(true)}>Forfeit</button>)}
-            {phase.type !== 'over' && (confirmLeave ? (
+            {phase.type !== 'over' && phase.type !== 'error' && phase.type !== 'loading' && (confirmLeave ? (
               <span class="confirm-inline">
-                <span>Leave this battle?</span>
+                <span>{online ? 'Leave? The battle carries on, and you can rejoin from the Online page.' : 'Leave this battle?'}</span>
                 <button class="btn btn-sm btn-danger" onClick={onLeave}>Leave</button>
                 <button class="btn btn-sm btn-ghost" onClick={() => setConfirmLeave(false)}>Stay</button>
               </span>
             ) : <button class="btn btn-sm btn-ghost" onClick={() => setConfirmLeave(true)}>Leave</button>)}
           </div>
         </div>
+        {online && live && !game.opponentOnline && (
+          <div class="battle-alert" role="status">
+            {names[game.opp]} lost connection. The battle waits for them; if they don't come back in time, you can claim the win.
+          </div>
+        )}
+        {online && live && game.autoMoved && phase.type !== 'choose' && (
+          <div class="notice">Your time ran out, so a move was picked for you.</div>
+        )}
         {stadium}
         {deck}
       </div>

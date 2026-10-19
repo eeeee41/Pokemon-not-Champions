@@ -136,6 +136,7 @@ test('two players find each other with Quick Match and play a whole doubles batt
   }, 'battle over', 120000);
   assert.deepEqual(strip(gr.match.raw), strip(ga.match.raw));
   assert.equal(ga.phase.winner, gr.phase.winner);
+  await until(() => fake.db.value(`matches/${a.id}/result`), 'result saved');
   const result = fake.db.value(`matches/${a.id}/result`);
   assert.equal(result.reason, 'battle');
   await until(() => !fake.db.value(`users/${ace.b.uid}/match`) && !fake.db.value(`users/${rival.b.uid}/match`), 'records saved');

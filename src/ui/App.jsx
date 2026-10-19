@@ -1,5 +1,5 @@
 // App shell and navigation.
-import {useEffect, useState} from 'preact/hooks';
+import {useEffect, useRef, useState} from 'preact/hooks';
 import {validateTeam} from '../engine/team.js';
 import {loadTeams, saveTeams, loadSettings, saveSettings} from './store.js';
 import {HomePage} from './Home.jsx';
@@ -7,7 +7,10 @@ import {TeamsPage} from './Teams.jsx';
 import {TeamEditor} from './TeamEditor.jsx';
 import {SetupPage} from './Setup.jsx';
 import {BattleScreen} from './Battle.jsx';
+import {OnlinePage, InviteBanner, onlineTeam} from './Online.jsx';
 import {LocalGame} from './local-game.js';
+import {OnlineSession} from './online-session.js';
+import {OnlineGame} from '../online/online-game.js';
 
 function BrandMark() {
   return (
@@ -19,11 +22,29 @@ function BrandMark() {
   );
 }
 
+const TITLE = typeof document !== 'undefined' ? document.title : '';
+
+/** While this tab is in the background, shows `text` in its title. */
+function flagTitle(text) {
+  if (typeof document === 'undefined' || !document.hidden) return;
+  document.title = `${text} · Champions PvP`;
+  const back = () => {
+    if (document.hidden) return;
+    document.title = TITLE;
+    document.removeEventListener('visibilitychange', back);
+  };
+  document.addEventListener('visibilitychange', back);
+}
+
 export function App() {
   const [teams, setTeams] = useState(loadTeams);
   const [settings, setSettings] = useState(loadSettings);
   const [route, setRoute] = useState({name: 'home'});
   const [game, setGame] = useState(null);
+  const [session] = useState(() => new OnlineSession());
+  const [online, setOnline] = useState(session.state);
+  const gameRef = useRef(null);
+  gameRef.current = game;
 
   useEffect(() => {
     saveTeams(teams);
@@ -36,9 +57,40 @@ export function App() {
     setRoute(r);
     window.scrollTo(0, 0);
   };
+
+  // Online: the session tells us when a battle is ready, wherever we are.
+  useEffect(() => {
+    const stop = session.subscribe(setOnline);
+    session.onMatch = info => {
+      const old = gameRef.current;
+      if (old?.dispose) old.dispose();
+      const next = new OnlineGame({backend: session.backend, matchId: info.id, side: info.side, teamCode: info.teamCode});
+      next.start();
+      setGame(next);
+      go({name: 'battle'});
+      flagTitle('⚔ Battle found!');
+    };
+    return stop;
+  }, [session]);
+  const invitesSeen = useRef(0);
+  useEffect(() => {
+    if (online.invites.length > invitesSeen.current) flagTitle(`⚔ ${online.invites[0].name} challenges you`);
+    invitesSeen.current = online.invites.length;
+  }, [online.invites]);
+
   const readyTeams = teams.filter(t => validateTeam(t).ok).length;
 
+  const closeGame = () => {
+    if (game?.online) {
+      session.leftBattle(game.id);
+      game.dispose();
+    }
+    setGame(null);
+  };
+
   const startGame = ({mode, players, hideChoices, names}) => {
+    // An online battle left open carries on without this page; it can be rejoined.
+    if (game?.online) closeGame();
     setSettings({...settings, mode, hideChoices, names, lastTeams: players.map(p => p.team.id)});
     setGame(new LocalGame({mode, players: players.map(p => ({name: p.name, team: JSON.parse(JSON.stringify(p.team))})), hideChoices}));
     go({name: 'battle'});
@@ -62,30 +114,70 @@ export function App() {
     ) : <TeamsPage teams={teams} setTeams={setTeams} onEdit={id => go({name: 'editor', id})} />;
   } else if (route.name === 'setup') {
     page = <SetupPage key={JSON.stringify(settings.lastTeams)} teams={teams} settings={settings} onStart={startGame} onTeams={() => go({name: 'teams'})} />;
+  } else if (route.name === 'online') {
+    page = (
+      <OnlinePage online={online} session={session} teams={teams} settings={settings} setSettings={setSettings}
+        onTeams={() => go({name: 'teams'})} onLocal={() => go({name: 'setup'})} />
+    );
   } else if (route.name === 'battle' && game) {
+    const opponent = game.online ? {uid: game.opponentUid, name: game.opponentName} : null;
+    const myCode = game.online ? game.teamCodes?.[game.side] : null;
+    const rematch = game.online ? {
+      invite: online.invites.find(i => i.from === game.opponentUid) || null,
+      waiting: online.task?.kind === 'challenge' && online.task.to === game.opponentUid,
+      notice: online.notice,
+      busy: online.busy,
+      available: online.status === 'ready' && !!game.opponentUid && !!myCode,
+    } : null;
     page = (
       <BattleScreen
         game={game}
         speed={settings.speed}
         onSpeed={speed => setSettings({...settings, speed})}
         onLeave={() => {
-          setGame(null);
-          go({name: 'setup'});
+          const wasOnline = !!game.online;
+          closeGame();
+          go({name: wasOnline ? 'online' : 'setup'});
         }}
         onRematch={() => {
+          if (game.online) {
+            session.challenge(opponent, game.mode, myCode);
+            return;
+          }
           setGame(new LocalGame({mode: game.mode, players: game.players, hideChoices: game.hideChoices}));
           window.scrollTo(0, 0);
         }}
+        rematch={rematch}
+        onAcceptRematch={() => rematch?.invite && session.accept(rematch.invite, myCode)}
+        onDeclineRematch={() => rematch?.invite && session.decline(rematch.invite)}
+        onCancelRematch={() => session.cancel()}
       />
     );
   } else {
-    page = <HomePage readyTeams={readyTeams} onTeams={() => go({name: 'teams'})} onPlay={mode => {
-      setSettings({...settings, mode});
-      go({name: 'setup'});
-    }} />;
+    page = (
+      <HomePage readyTeams={readyTeams} onTeams={() => go({name: 'teams'})}
+        onOnline={mode => {
+          if (mode) setSettings({...settings, onlineMode: mode});
+          go({name: 'online'});
+        }}
+        onPlay={mode => {
+          setSettings({...settings, mode});
+          go({name: 'setup'});
+        }} />
+    );
   }
 
-  const section = route.name === 'teams' || route.name === 'editor' ? 'teams' : route.name === 'home' ? 'home' : 'play';
+  // A challenge reaches you on any page, except mid-battle (and rematch offers,
+  // which the battle's result card shows).
+  const inBattle = route.name === 'battle' && game?.online && game.phase.type !== 'over';
+  const banner = route.name !== 'online' && !inBattle ?
+    online.invites.find(i => !(route.name === 'battle' && game?.online && i.from === game.opponentUid)) : null;
+  const team = onlineTeam(teams, settings);
+
+  const section = route.name === 'teams' || route.name === 'editor' ? 'teams' : route.name === 'home' ? 'home' :
+    route.name === 'online' || (route.name === 'battle' && game?.online) ? 'online' : 'play';
+  const localGame = game && !game.online ? game : null;
+  const onlineGame = game?.online ? game : null;
   return (
     <div class="app">
       <header class="topbar">
@@ -96,12 +188,25 @@ export function App() {
             <small>Beta</small>
           </button>
           <nav class="nav" aria-label="Main">
-            <button aria-current={section === 'play' ? 'page' : undefined} onClick={() => go(game ? {name: 'battle'} : {name: 'setup'})}>{game ? 'Battle' : 'Play'}</button>
+            <button aria-current={section === 'play' ? 'page' : undefined} onClick={() => go(localGame ? {name: 'battle'} : {name: 'setup'})}>
+              {localGame ? 'Battle' : 'Play'}
+            </button>
+            <button aria-current={section === 'online' ? 'page' : undefined} onClick={() => go(onlineGame ? {name: 'battle'} : {name: 'online'})}>
+              Online{online.invites.length > 0 && <span class="nav-badge" aria-label={`${online.invites.length} challenge`}>{online.invites.length}</span>}
+            </button>
             <button aria-current={section === 'teams' ? 'page' : undefined} onClick={() => go({name: 'teams'})}>Teams</button>
           </nav>
         </div>
       </header>
-      <main class="main">{page}</main>
+      <main class="main">
+        {banner && (
+          <InviteBanner invite={banner} team={team} busy={online.busy}
+            onAccept={() => session.accept(banner, team)}
+            onDecline={() => session.decline(banner)}
+            onOpen={() => go({name: 'online'})} />
+        )}
+        {page}
+      </main>
       <footer class="footer">
         <div class="footer-inner">
           A fan project. Battle engine: Pokémon Showdown (MIT). Sprites: Smogon's sprite project. Pokémon © Nintendo, Game Freak and Creatures.

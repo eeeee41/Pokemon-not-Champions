@@ -1,10 +1,13 @@
 {
   "hosting": {
     "public": "dist",
-    "ignore": ["artifact.html", "**/.*"],
+    "ignore": ["artifact.html", "champions-pvp-offline.html", "**/.*"],
     "headers": [
       {"source": "/assets/**", "headers": [{"key": "Cache-Control", "value": "public, max-age=604800"}]},
       {"source": "/app.@(js|css)", "headers": [{"key": "Cache-Control", "value": "public, max-age=300"}]}
     ]
+  },
+  "database": {
+    "rules": "database.rules.json"
   }
 }

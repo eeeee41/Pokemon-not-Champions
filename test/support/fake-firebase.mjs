@@ -221,7 +221,7 @@ class Session {
  * Starts the fake on a free port. Returns {port, db, sessions, requests, close()}.
  * db is the MemoryServer holding the data (db.value(path) to inspect it).
  */
-export async function startFakeFirebase({rules, projectId = 'demo-champions'}) {
+export async function startFakeFirebase({rules, projectId = 'demo-champions', port = 0}) {
   const fake = {
     db: new MemoryServer({rules}),
     sessions: new Set(),
@@ -240,11 +240,23 @@ export async function startFakeFirebase({rules, projectId = 'demo-champions'}) {
   };
 
   const server = http.createServer((req, res) => {
+    // Pages served from another port call this one, so answer browsers' CORS checks.
+    const cors = {
+      'access-control-allow-origin': req.headers.origin || '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': req.headers['access-control-request-headers'] || '*',
+      'access-control-max-age': '600',
+    };
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, cors);
+      res.end();
+      return;
+    }
     let body = '';
     req.on('data', chunk => (body += chunk));
     req.on('end', () => {
       const send = (status, json) => {
-        res.writeHead(status, {'content-type': 'application/json'});
+        res.writeHead(status, {...cors, 'content-type': 'application/json'});
         res.end(JSON.stringify(json));
       };
       const path = new URL(req.url, 'http://local').pathname;
@@ -269,7 +281,7 @@ export async function startFakeFirebase({rules, projectId = 'demo-champions'}) {
   const wss = new WebSocketServer({server});
   let ids = 0;
   wss.on('connection', ws => fake.sessions.add(new Session(fake, ws, ++ids)));
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await new Promise(resolve => server.listen(port, '127.0.0.1', resolve));
   fake.port = server.address().port;
   fake.host = `127.0.0.1:${fake.port}`;
   fake.close = async () => {

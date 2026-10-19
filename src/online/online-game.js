@@ -78,6 +78,7 @@ export class OnlineGame {
     this.autoMoved = false;
     this.broken = false;
     this.syncNote = '';
+    this.teamCodes = null;
   }
 
   subscribe(fn) {
@@ -183,6 +184,7 @@ export class OnlineGame {
       {name: n1, team: decoded[0], uid: this.header.p1.uid},
       {name: n2, team: decoded[1], uid: this.header.p2.uid},
     ];
+    this.teamCodes = {p1: teams.p1, p2: teams.p2};
     this.match = new Match({mode: this.mode, seed: this.header.seed, players: this.players});
 
     // Everything chosen so far (when rejoining), applied in one go...

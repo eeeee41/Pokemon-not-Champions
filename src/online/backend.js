@@ -193,8 +193,14 @@ export class FirebaseBackend {
   }
 }
 
-/** Creates the backend for this site, or null when Firebase isn't set up here. */
+/**
+ * Creates the backend for this site, or null when Firebase isn't set up here.
+ * For local development, a page can set window.CHAMPIONS_FIREBASE_EMULATORS
+ * (same shape as FirebaseBackend's `emulators` option) before the app loads.
+ */
 export async function createBackend() {
   const config = await loadFirebaseConfig();
-  return config ? new FirebaseBackend(config) : null;
+  if (!config) return null;
+  const emulators = typeof window !== 'undefined' ? window.CHAMPIONS_FIREBASE_EMULATORS : undefined;
+  return new FirebaseBackend(config, emulators ? {emulators} : {});
 }

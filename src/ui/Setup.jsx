@@ -4,10 +4,10 @@ import {validateTeam} from '../engine/team.js';
 import {MODES} from '../engine/constants.js';
 import {FitSprite} from './sprites.jsx';
 
-function TeamOption({team, selected, onSelect}) {
+export function TeamOption({team, selected, onSelect, disabled = false}) {
   const {ok, problems} = validateTeam(team);
   return (
-    <button class="team-option" aria-pressed={selected} disabled={!ok} onClick={onSelect}
+    <button class="team-option" aria-pressed={selected} disabled={!ok || disabled} onClick={onSelect}
       title={ok ? '' : problems.map(p => p.text).join('\n')}>
       <span class="row">
         <strong style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{team.name}</strong>
@@ -53,7 +53,7 @@ export function SetupPage({teams, settings, onStart, onTeams}) {
         <div>
           <p class="eyebrow">Local battle</p>
           <h1>Two players, one device</h1>
-          <p class="muted">Take turns on this screen. Online Quick Match comes next, once the site is connected to Firebase.</p>
+          <p class="muted">Take turns on this screen. To play someone on another device, use Online.</p>
         </div>
       </div>
 

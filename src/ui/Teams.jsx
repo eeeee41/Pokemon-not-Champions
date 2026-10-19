@@ -24,7 +24,7 @@ export function StatusChip({team}) {
   return <span class="chip chip-bad">{problems.length} {problems.length === 1 ? 'problem' : 'problems'}</span>;
 }
 
-function CopyButton({text, target = 'export-text', label = 'Copy'}) {
+export function CopyButton({text, target = 'export-text', label = 'Copy', className = 'btn btn-primary'}) {
   const [state, setState] = useState(label);
   const copy = () => {
     const done = () => setState('Copied');
@@ -42,7 +42,7 @@ function CopyButton({text, target = 'export-text', label = 'Copy'}) {
       fail();
     }
   };
-  return <button class="btn btn-primary" onClick={copy}>{state}</button>;
+  return <button class={className} onClick={copy}>{state}</button>;
 }
 
 function ExportSheet({team, onClose}) {

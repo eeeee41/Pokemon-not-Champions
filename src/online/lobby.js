@@ -113,6 +113,7 @@ export class Lobby {
     // After a dropped connection the server has already removed our presence
     // (that's what removeOnDisconnect does), so put it back.
     let wasOffline = false;
+    if (this.stopConnection) this.stopConnection();
     this.stopConnection = this.b.watchConnection(connected => {
       if (!connected) {
         wasOffline = true;

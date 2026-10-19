@@ -85,7 +85,8 @@ for (const mode of ['singles', 'doubles']) {
     assert.deepEqual(strip(gr.match.raw), strip(ga.match.raw));
     assert.equal(ga.phase.winner, gr.phase.winner);
     // Results and records are saved once.
-    const result = server.value(`matches/${a.id}/result`);
+    await until(() => server.value(`matches/${a.id}/result`), 'result saved');
+  const result = server.value(`matches/${a.id}/result`);
     assert.equal(result.reason, 'battle');
     await until(() => !server.value('users/ace/match') && !server.value('users/rival/match'), 'records saved');
     const recA = server.value('users/ace');

@@ -4,7 +4,7 @@ import {Sprite} from './sprites.jsx';
 
 const LINEUP = ['Garchomp-Mega', 'Charizard-Gmax', 'Kingambit', 'Flutter Mane', 'Clefable-Mega'];
 
-export function HomePage({onPlay, onTeams, readyTeams}) {
+export function HomePage({onPlay, onOnline, onTeams, readyTeams}) {
   return (
     <div class="home">
       <section class="hero">
@@ -13,7 +13,7 @@ export function HomePage({onPlay, onTeams, readyTeams}) {
           <h1>Build six. <em>Battle a friend.</em></h1>
           <p>Every Pokémon from every generation, with Mega Evolution, Z-Moves, Gigantamax and Terastallization, on Pokémon Champions stat rules.</p>
           <div class="btn-row">
-            <button class="btn btn-primary btn-lg" onClick={() => onPlay('singles')}>Start a battle</button>
+            <button class="btn btn-primary btn-lg" onClick={() => onOnline()}>Battle online</button>
             <button class="btn btn-lg" onClick={onTeams}>Build a team</button>
           </div>
         </div>
@@ -49,17 +49,19 @@ export function HomePage({onPlay, onTeams, readyTeams}) {
             <h2>{m.label}</h2>
             <p class="muted">One player against one player, {m.active === 1 ? 'one Pokémon out each. Pure head-to-head.' : 'two Pokémon out each. Targeting, spread moves and partners matter.'}</p>
             <div class="btn-row">
-              <button class="btn btn-primary" onClick={() => onPlay(m.id)} disabled={!readyTeams}>Play {m.label}</button>
+              <button class="btn btn-primary" onClick={() => onOnline(m.id)} disabled={!readyTeams}>{m.label} online</button>
+              <button class="btn" onClick={() => onPlay(m.id)} disabled={!readyTeams}>On this device</button>
             </div>
           </article>
         ))}
       </section>
 
       <section class="card online-note">
-        <span class="online-dot" aria-hidden="true" />
+        <span class="online-dot live" aria-hidden="true" />
         <div>
-          <strong>Online Quick Match is next.</strong>
-          <span class="muted"> Right now both players share this device. Once the site is hosted on Firebase, you'll queue for Singles or Doubles and get matched with another player.</span>
+          <strong>Three ways to find a battle online.</strong>
+          <span class="muted"> Quick Match pairs you with the next player who's looking. A private code is for a friend.
+            And anyone in the lobby can be challenged directly. Online play works on the hosted site.</span>
         </div>
       </section>
     </div>

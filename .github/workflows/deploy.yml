@@ -1,9 +1,13 @@
 name: Test and deploy
 
+# Every push to main is tested, then published to Firebase: the database
+# security rules (database.rules.json) first, then the site itself.
+# Pull requests are only tested. "Run workflow" on the Actions tab deploys too.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,8 +21,20 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Deploy to Firebase Hosting
-        if: github.event_name == 'push' && vars.FIREBASE_PROJECT_ID != ''
+
+      - name: Publish database rules
+        if: github.event_name != 'pull_request' && vars.FIREBASE_PROJECT_ID != ''
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          key="$RUNNER_TEMP/service-account.json"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$SERVICE_ACCOUNT" > "$key"
+          GOOGLE_APPLICATION_CREDENTIALS="$key" npx --yes firebase-tools@15 deploy --only database --project "$PROJECT" --non-interactive
+
+      - name: Deploy the site to Firebase Hosting
+        if: github.event_name != 'pull_request' && vars.FIREBASE_PROJECT_ID != ''
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
