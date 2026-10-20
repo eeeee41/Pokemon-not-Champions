@@ -116,3 +116,27 @@ test('it has its own sprites', () => {
   }
   assert.notDeepEqual(sprites.sheets.front.missingno, sprites.sheets.front.missingnomega);
 });
+
+test('a team may have any number of MissingNo., but still only one of anything else', () => {
+  const mn = importTeams(SET)[0].mons[0];
+  const six = {name: 'All MissingNo.', mons: Array.from({length: 6}, () => structuredClone(mn))};
+  const v = validateTeam(six);
+  assert.ok(v.ok, v.problems.map(p => p.text).join('; '));
+
+  const twoOthers = sampleTeams()[0];
+  twoOthers.mons[0] = mn;
+  twoOthers.mons[2] = structuredClone(twoOthers.mons[1]);
+  const texts = validateTeam(twoOthers).problems.map(p => p.text);
+  assert.ok(texts.some(t => t.startsWith('Species Clause')), texts.join('; '));
+  assert.ok(texts.some(t => t.startsWith('Item Clause')), texts.join('; '));
+
+  const m = new Match({mode: 'singles', seed: '1,2,3,4', players: [{name: 'Me', team: six}, {name: 'Foe', team: sampleTeams()[2]}]});
+  const names = m.battle.p1.pokemon.map(p => p.name);
+  assert.equal(new Set(names).size, 6, names.join(', '));
+  assert.deepEqual(names.slice(0, 3), ['MissingNo.', 'MissingNo. 2', 'MissingNo. 3']);
+  m.choose(0, 'team 123456');
+  m.choose(1, 'team 123456');
+  m.choose(0, 'switch 3');
+  m.choose(1, 'move 1');
+  assert.equal(m.battle.p1.active[0].name, 'MissingNo. 3');
+});

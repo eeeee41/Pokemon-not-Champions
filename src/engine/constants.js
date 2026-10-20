@@ -26,8 +26,8 @@ export const MODES = {
   doubles: {id: 'doubles', label: 'Doubles', active: 2, blurb: '2 Pokémon out each'},
 };
 
-// Team clauses, as in Pokémon Champions / VGC. Species Clause also keeps names
-// unique, which the battle protocol relies on.
+// Team clauses, as in Pokémon Champions / VGC. The one exception is MissingNo.,
+// which a team may have any number of (toSimTeam keeps their names unique).
 export const RULES = {
   speciesClause: true,
   itemClause: true,

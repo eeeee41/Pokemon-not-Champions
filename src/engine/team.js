@@ -128,6 +128,7 @@ export function validateTeam(team) {
     mons.forEach((mon, index) => {
       const s = dex.species.get(mon.species);
       if (!s.exists) return;
+      if (isCreatorSpecies(s)) return; // MissingNo. alone may appear any number of times
       if (byNum.has(s.num)) {
         problems.push({index, text: `Species Clause: only one ${s.baseSpecies} per team.`});
       } else byNum.set(s.num, index);
@@ -138,6 +139,7 @@ export function validateTeam(team) {
     mons.forEach((mon, index) => {
       if (!mon.item) return;
       const id = toID(mon.item);
+      if (id === 'missingnite' && isCreatorSpecies(mon.species)) return; // one for each MissingNo.
       if (items.has(id)) {
         problems.push({index, text: `Item Clause: only one ${dex.items.get(id).name} per team.`});
       } else items.set(id, index);
@@ -174,7 +176,16 @@ export function toSimSet(mon) {
 }
 
 export function toSimTeam(team) {
-  return team.mons.map(toSimSet);
+  // Names must be unique in battle; repeats (several MissingNo.) get a number.
+  const used = new Set();
+  return team.mons.map(mon => {
+    const set = toSimSet(mon);
+    let name = set.name;
+    for (let n = 2; used.has(name.toLowerCase()); n++) name = `${set.name.slice(0, 15)} ${n}`;
+    used.add(name.toLowerCase());
+    set.name = name;
+    return set;
+  });
 }
 
 // ---------- Showdown text format ----------
