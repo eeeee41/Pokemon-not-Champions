@@ -19,7 +19,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run the tests
+        # Failing tests are also listed as notes on the run, so they're easy to find.
+        run: |
+          set -o pipefail
+          if ! npm test 2>&1 | tee "$RUNNER_TEMP/test.log"; then
+            grep -E '^\s*not ok|^\s+(error|location):' "$RUNNER_TEMP/test.log" | head -n 20 | while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              echo "::error title=Test failed::${line}"
+            done
+            exit 1
+          fi
       - run: npm run build
 
       - name: Publish database rules
