@@ -232,7 +232,7 @@ const LOCKS = {
 };
 
 function normalize(text) {
-  // "[secret phrase]" works as well as the phrase alone.
+  // The phrase works with or without "Missing No." on the end.
   return String(text || '').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/ missing ?no$/, '');
 }
 

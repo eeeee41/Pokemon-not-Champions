@@ -21,6 +21,10 @@ jobs:
       - run: npm ci
       - name: Run the tests
         # Failing tests are also listed as notes on the run, so they're easy to find.
+        # The secret-phrase tests run only when those repository secrets are set.
+        env:
+          CPVP_CREATOR_PHRASE: ${{ secrets.CPVP_CREATOR_PHRASE }}
+          CPVP_GLITCH_PHRASE: ${{ secrets.CPVP_GLITCH_PHRASE }}
         run: |
           set -o pipefail
           if ! npm test 2>&1 | tee "$RUNNER_TEMP/test.log"; then

@@ -35,7 +35,15 @@ function start() {
   return m;
 }
 
-const PHRASE = '[secret phrase]';
+// The real secret phrases are never in the code: tests that need them read
+// them from the environment (GitHub keeps them as repository secrets) and are
+// skipped without them.
+const PHRASE = process.env.CPVP_CREATOR_PHRASE || '';
+const GLITCH_PHRASE = process.env.CPVP_GLITCH_PHRASE || '';
+const NEED_PHRASES = !(PHRASE && GLITCH_PHRASE) && 'the secret phrases are not set (CPVP_CREATOR_PHRASE, CPVP_GLITCH_PHRASE)';
+// Same words, different capitals and punctuation.
+const scramble = text => `  ${text.toUpperCase().replace(/,/g, ' —').replace(/\.$/, '...')}  `;
+const lastWordOff = text => text.replace(/\s*\S+\s*$/, '');
 
 function fakeStorage() {
   const store = new Map();
@@ -51,14 +59,15 @@ test('the built-in SHA-256 matches the standard one', () => {
   }
 });
 
-test('the secret phrase unlocks it; other text and hand-edited saves do not', async () => {
+test('the secret phrase unlocks it; other text and hand-edited saves do not', {skip: NEED_PHRASES}, async () => {
   const store = fakeStorage();
   lockCreator();
   try {
     assert.equal(creatorUnlocked(), false);
     assert.equal(await tryCreatorCode('MissingNo'), false);
-    assert.equal(await tryCreatorCode('[secret phrase]'), false);
-    assert.equal(await tryCreatorCode('[secret phrase]'), false);
+    assert.equal(await tryCreatorCode(lastWordOff(PHRASE)), false);
+    assert.equal(await tryCreatorCode(`${PHRASE} MissingNo. Extra`), false);
+    assert.equal(await tryCreatorCode(GLITCH_PHRASE), false);
     assert.equal(creatorUnlocked(), false);
     // Faking the saved unlock doesn't work.
     for (const fake of ['1', 'true', '0b8cdf286e6529a5e2d7a92fc0ef8fdc39e399f154b848d94a52c4c43aab0651',
@@ -68,15 +77,15 @@ test('the secret phrase unlocks it; other text and hand-edited saves do not', as
       assert.equal(creatorUnlocked(), false, fake);
     }
     store.clear();
-    assert.equal(await tryCreatorCode('  [secret phrase]'), true);
+    assert.equal(await tryCreatorCode(scramble(`${PHRASE} Missing No.`)), true);
     assert.equal(creatorUnlocked(), true);
     // It is remembered: a fresh visit with the saved token is still unlocked.
     lockCreator();
     assert.equal(creatorUnlocked(), true);
-    for (const phrase of ['[secret phrase]', '[secret phrase]']) {
+    for (const phrase of [PHRASE, `${PHRASE} MissingNo.`]) {
       store.clear();
       lockCreator();
-      assert.equal(await tryCreatorCode(phrase), true, phrase);
+      assert.equal(await tryCreatorCode(phrase), true, 'variant');
     }
   } finally {
     lockCreator();
@@ -94,13 +103,6 @@ test('while locked, teams with MissingNo. are not usable (opponents\' teams stil
   assert.ok(validateTeam(sampleTeams()[0]).ok);
 });
 
-test('unlock for the rest of these tests', async () => {
-  fakeStorage();
-  assert.equal(await tryCreatorCode(PHRASE), true);
-  delete globalThis.localStorage; // the unlock lasts for this visit
-  assert.equal(creatorUnlocked(), true);
-});
-
 test('every type, huge stats, any move, and a legal team', () => {
   const s = dex.species.get('MissingNo.');
   assert.equal(s.types.length, 18);
@@ -111,7 +113,7 @@ test('every type, huge stats, any move, and a legal team', () => {
   assert.ok(learnableMoveIds('MissingNo.').length > 800);
   assert.ok(canLearn('MissingNo.', 'Spore') && canLearn('MissingNo.', 'V-create'));
   const team = teamWithMissingNo();
-  const v = validateTeam(team);
+  const v = validateTeam(team, {creator: true});
   assert.ok(v.ok, v.problems.map(p => p.text).join('; '));
   const back = decodeTeam(encodeTeam(team)).mons[0];
   assert.equal(back.species, 'MissingNo.');
@@ -167,7 +169,7 @@ test('it has its own sprites', () => {
 test('a team may have any number of MissingNo., but still only one of anything else', () => {
   const mn = importTeams(SET)[0].mons[0];
   const six = {name: 'All MissingNo.', mons: Array.from({length: 6}, () => structuredClone(mn))};
-  const v = validateTeam(six);
+  const v = validateTeam(six, {creator: true});
   assert.ok(v.ok, v.problems.map(p => p.text).join('; '));
 
   const twoOthers = sampleTeams()[0];
@@ -188,9 +190,7 @@ test('a team may have any number of MissingNo., but still only one of anything e
   assert.equal(m.battle.p1.active[0].name, 'MissingNo. 3');
 });
 
-const GLITCH_PHRASE = '[secret phrase]';
-
-test('Glitched Power: its own phrase, only MissingNo. learns it, and it is locked until then', async () => {
+test('Glitched Power: its own phrase, only MissingNo. learns it, and it is locked until then', {skip: NEED_PHRASES}, async () => {
   const store = fakeStorage();
   lockCreator();
   try {
@@ -205,8 +205,8 @@ test('Glitched Power: its own phrase, only MissingNo. learns it, and it is locke
     // The MissingNo. phrase doesn't unlock it, and neither does a faked save.
     store.set('champions-pvp.glitch.v1', '68a0e9fdf450ca3bfae44b363f4fa68b0079bcc1aa824f11e3cade8fab2ac036');
     assert.equal(glitchedPowerUnlocked(), false);
-    assert.equal(await tryUnlock('[secret phrase]'), null);
-    assert.equal(await tryUnlock('[secret phrase]'), 'glitchedpower');
+    assert.equal(await tryUnlock(lastWordOff(GLITCH_PHRASE)), null);
+    assert.equal(await tryUnlock(scramble(GLITCH_PHRASE)), 'glitchedpower');
     assert.equal(glitchedPowerUnlocked(), true);
     lockCreator();
     assert.equal(glitchedPowerUnlocked(), true, 'remembered in this browser');
@@ -215,9 +215,6 @@ test('Glitched Power: its own phrase, only MissingNo. learns it, and it is locke
     lockCreator();
     delete globalThis.localStorage;
   }
-  // Leave both unlocked for the battle test below.
-  assert.equal(await tryUnlock(PHRASE), 'missingno');
-  assert.equal(await tryUnlock(GLITCH_PHRASE), 'glitchedpower');
 });
 
 test('Glitched Power raises every stat, accuracy and evasion by 6, and has 1 PP', () => {
