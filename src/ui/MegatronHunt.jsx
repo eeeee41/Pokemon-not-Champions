@@ -16,8 +16,8 @@ export function HiddenPart({page}) {
   const part = PARTS.find(p => p.page === page);
   if (!part || found.includes(part.id)) return null;
   return (
-    <button class={`hidden-part hp-${page}`} title="A strange machine part" aria-label="A strange machine part" onClick={() => collectPart(part.id)}>
-      <PartIcon part={part.id} size={40} />
+    <button class={`hidden-part hp-${page} hp-${PARTS.indexOf(part) % 2 ? 'left' : 'right'}`} title="A strange machine part" aria-label="A strange machine part" onClick={() => collectPart(part.id)}>
+      <PartIcon part={part.id} size={72} />
     </button>
   );
 }

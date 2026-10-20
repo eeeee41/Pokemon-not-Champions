@@ -274,18 +274,24 @@ a { color: var(--gold-ink); }
 /* The Megatron parts hunt */
 .main { position: relative; }
 .hidden-part {
-  position: absolute; z-index: 5; padding: 0; border: 0; background: none; cursor: pointer;
-  opacity: .82; animation: part-bob 3.2s ease-in-out infinite;
+  position: absolute; z-index: 5; padding: 6px; border: 0; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle, rgba(168, 92, 255, .35), rgba(168, 92, 255, 0) 70%);
+  animation: part-bob 3.2s ease-in-out infinite, part-glow 2.4s ease-in-out infinite;
 }
-.hidden-part:hover, .hidden-part:focus-visible { opacity: 1; transform: scale(1.12); }
-@keyframes part-bob { 50% { translate: 0 -4px; } }
-@media (prefers-reduced-motion: reduce) { .hidden-part { animation: none; } }
-.hp-home { top: 4px; right: 8px; }
-.hp-setup { bottom: 6px; left: 8px; }
-.hp-rivals { bottom: 6px; right: 8px; }
-.hp-online { bottom: 6px; left: 8px; }
-.hp-teams { bottom: 6px; right: 8px; }
-.hp-editor { bottom: 6px; left: 8px; }
+.hidden-part:hover, .hidden-part:focus-visible { transform: scale(1.12); }
+@keyframes part-bob { 50% { translate: 0 -6px; } }
+@keyframes part-glow { 50% { filter: drop-shadow(0 0 10px rgba(168, 92, 255, .9)); } }
+@media (prefers-reduced-motion: reduce) { .hidden-part { animation: none; filter: drop-shadow(0 0 8px rgba(168, 92, 255, .8)); } }
+/* On the side edges, a little way down; out in the margin on wide screens. */
+.hp-left { left: min(4px, calc((1200px - 100vw) / 2 + 8px)); }
+.hp-right { right: min(4px, calc((1200px - 100vw) / 2 + 8px)); }
+@media (max-width: 700px) { .hidden-part { padding: 2px; } .hidden-part .part-icon { zoom: .75; } }
+.hp-home { top: 340px; }
+.hp-setup { top: 300px; }
+.hp-rivals { top: 380px; }
+.hp-online { top: 320px; }
+.hp-teams { top: 300px; }
+.hp-editor { top: 360px; }
 .part-icon { display: inline-block; image-rendering: pixelated; flex: none; }
 .parts-counter {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border-radius: 999px;
