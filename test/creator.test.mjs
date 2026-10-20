@@ -7,7 +7,8 @@ import {encodeTeam, decodeTeam} from '../src/engine/savecode.js';
 import {Match} from '../src/engine/match.js';
 import {sampleTeams} from '../src/engine/samples.js';
 import {canLearn, learnableMoveIds} from '../src/engine/learnsets.js';
-import {tryCreatorCode, creatorUnlocked, isCreatorSpecies} from '../src/engine/creator.js';
+import {tryCreatorCode, creatorUnlocked, isCreatorSpecies, lockCreator, sha256} from '../src/engine/creator.js';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 
 const SET = `MissingNo. @ MissingNite
@@ -34,24 +35,70 @@ function start() {
   return m;
 }
 
-test('the secret phrase unlocks it; other text does not', async () => {
+const PHRASE = '[secret phrase]';
+
+function fakeStorage() {
   const store = new Map();
-  globalThis.localStorage = {getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v))};
+  globalThis.localStorage = {
+    getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k),
+  };
+  return store;
+}
+
+test('the built-in SHA-256 matches the standard one', () => {
+  for (const text of ['', 'abc', 'x'.repeat(55), 'y'.repeat(64), 'é ✓ 🎮'.repeat(30)]) {
+    assert.equal(sha256(text), crypto.createHash('sha256').update(text).digest('hex'));
+  }
+});
+
+test('the secret phrase unlocks it; other text and hand-edited saves do not', async () => {
+  const store = fakeStorage();
+  lockCreator();
   try {
     assert.equal(creatorUnlocked(), false);
     assert.equal(await tryCreatorCode('MissingNo'), false);
     assert.equal(await tryCreatorCode('[secret phrase]'), false);
     assert.equal(await tryCreatorCode('[secret phrase]'), false);
     assert.equal(creatorUnlocked(), false);
+    // Faking the saved unlock doesn't work.
+    for (const fake of ['1', 'true', '0b8cdf286e6529a5e2d7a92fc0ef8fdc39e399f154b848d94a52c4c43aab0651',
+      '6ea042fe204b1d008f75be6077d66c5dad29a7b2ef34252a08b060109c65515f']) {
+      store.set('champions-pvp.creator.v2', fake);
+      store.set('champions-pvp.creator.v1', '1');
+      assert.equal(creatorUnlocked(), false, fake);
+    }
+    store.clear();
     assert.equal(await tryCreatorCode('  [secret phrase]'), true);
     assert.equal(creatorUnlocked(), true);
-    store.clear();
-    assert.equal(await tryCreatorCode('[secret phrase]'), true);
-    store.clear();
-    assert.equal(await tryCreatorCode('[secret phrase]'), true);
+    // It is remembered: a fresh visit with the saved token is still unlocked.
+    lockCreator();
+    assert.equal(creatorUnlocked(), true);
+    for (const phrase of ['[secret phrase]', '[secret phrase]']) {
+      store.clear();
+      lockCreator();
+      assert.equal(await tryCreatorCode(phrase), true, phrase);
+    }
   } finally {
+    lockCreator();
     delete globalThis.localStorage;
   }
+});
+
+test('while locked, teams with MissingNo. are not usable (opponents\' teams still are)', () => {
+  lockCreator();
+  const team = teamWithMissingNo();
+  const v = validateTeam(team);
+  assert.equal(v.ok, false);
+  assert.deepEqual(v.problems.map(p => [p.index, p.text]), [[0, 'This Pokémon is locked.']]);
+  assert.ok(validateTeam(team, {creator: true}).ok);
+  assert.ok(validateTeam(sampleTeams()[0]).ok);
+});
+
+test('unlock for the rest of these tests', async () => {
+  fakeStorage();
+  assert.equal(await tryCreatorCode(PHRASE), true);
+  delete globalThis.localStorage; // the unlock lasts for this visit
+  assert.equal(creatorUnlocked(), true);
 });
 
 test('every type, huge stats, any move, and a legal team', () => {

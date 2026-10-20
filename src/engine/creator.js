@@ -16,7 +16,6 @@ import {Dex} from '@pkmn/sim';
 export const CREATOR_SPECIES = 'MissingNo.';
 export const CREATOR_ID = 'missingno';
 const CODE_HASH = '0b8cdf286e6529a5e2d7a92fc0ef8fdc39e399f154b848d94a52c4c43aab0651';
-const UNLOCK_KEY = 'champions-pvp.creator.v1';
 
 const ALL_TYPES = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground',
   'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
@@ -189,37 +188,106 @@ function install() {
 install();
 
 // ---------- unlocking ----------
+//
+// Typing the phrase stores a token made from the phrase itself. Only a hash of
+// that token is kept here, so the token can't be read out of the code or
+// faked by editing the browser's saved data: it takes the phrase.
+
+const TOKEN_PREFIX = 'champions-pvp creator token|';
+const TOKEN_CHECK = '6ea042fe204b1d008f75be6077d66c5dad29a7b2ef34252a08b060109c65515f';
+const UNLOCK_KEY = 'champions-pvp.creator.v2';
 
 function normalize(text) {
   // "[secret phrase]" works as well as the phrase alone.
   return String(text || '').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/ missing ?no$/, '');
 }
 
-async function sha256(text) {
+// A small synchronous SHA-256, so the unlock can be checked while drawing.
+const K = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);
+
+export function sha256(text) {
   const bytes = new TextEncoder().encode(text);
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export function creatorUnlocked() {
-  try {
-    return localStorage.getItem(UNLOCK_KEY) === '1';
-  } catch {
-    return false;
+  const len = bytes.length;
+  const total = ((len + 9 + 63) >> 6) << 6;
+  const buf = new Uint8Array(total);
+  buf.set(bytes);
+  buf[len] = 0x80;
+  const view = new DataView(buf.buffer);
+  view.setUint32(total - 8, Math.floor(len / 0x20000000));
+  view.setUint32(total - 4, (len << 3) >>> 0);
+  const h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+  const w = new Uint32Array(64);
+  const rot = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < total; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rot(w[i - 15], 7) ^ rot(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rot(w[i - 2], 17) ^ rot(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, k] = h;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (k + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+      const t2 = ((rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      k = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
   }
+  return [...h].map(x => x.toString(16).padStart(8, '0')).join('');
 }
 
-/** Resolves true (and remembers it in this browser) when `text` is the secret phrase. */
+let session = false; // unlocked this visit, even if the browser won't save it
+let checked = null;
+
+/** Has this browser been unlocked with the phrase? */
+export function creatorUnlocked() {
+  if (session) return true;
+  let token = null;
+  try {
+    token = globalThis.localStorage?.getItem(UNLOCK_KEY) ?? null;
+  } catch {
+    token = null;
+  }
+  if (!token) return false;
+  if (checked?.token !== token) checked = {token, ok: sha256(token) === TOKEN_CHECK};
+  return checked.ok;
+}
+
+/** True (and remembered in this browser) when `text` is the secret phrase. */
 export async function tryCreatorCode(text) {
   const clean = normalize(text);
   if (clean.split(' ').length < 6) return false;
-  if ((await sha256(clean)) !== CODE_HASH) return false;
+  if (sha256(clean) !== CODE_HASH) return false;
+  const token = sha256(TOKEN_PREFIX + clean);
+  if (sha256(token) !== TOKEN_CHECK) return false;
+  session = true;
   try {
-    localStorage.setItem(UNLOCK_KEY, '1');
+    globalThis.localStorage?.setItem(UNLOCK_KEY, token);
+    globalThis.localStorage?.removeItem('champions-pvp.creator.v1');
   } catch {
     // Unlocked for this visit only.
   }
   return true;
+}
+
+/** Forgets the unlock (for tests). */
+export function lockCreator() {
+  session = false;
+  checked = null;
+}
+
+/** Does this team have MissingNo. in it? */
+export function hasCreatorMon(team) {
+  return (team?.mons || []).some(m => isCreatorSpecies(m.species));
 }
 
 export const CREATOR_SP_TOTAL = 192; // 32 in every stat

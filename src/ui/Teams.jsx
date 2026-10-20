@@ -6,6 +6,7 @@ import {encodeTeam, decodeTeam, findSaveCodes} from '../engine/savecode.js';
 import {TEAM_SIZE} from '../engine/constants.js';
 import {FitSprite} from './sprites.jsx';
 import {Sheet} from './pickers.jsx';
+import {creatorUnlocked, isCreatorSpecies} from '../engine/creator.js';
 
 export function TeamStrip({team, height = 52}) {
   const cells = [];
@@ -76,6 +77,7 @@ function ImportSheet({onImport, onClose}) {
     const codes = findSaveCodes(text);
     const teams = [];
     const problems = [];
+    let note = '';
     for (const code of codes) {
       try {
         teams.push(decodeTeam(code));
@@ -86,11 +88,26 @@ function ImportSheet({onImport, onClose}) {
     // Anything that isn't a save code is read as Showdown text.
     const rest = codes.reduce((t, c) => t.replace(c, ''), text);
     if (rest.trim()) teams.push(...importTeams(rest));
+    // MissingNo. only comes along where it has been unlocked.
+    if (!creatorUnlocked()) {
+      let left = 0;
+      for (const team of teams) {
+        const kept = team.mons.filter(m => !isCreatorSpecies(m.species));
+        left += team.mons.length - kept.length;
+        team.mons = kept;
+      }
+      if (left) note = ` Left out ${left} Pokémon you haven't unlocked.`;
+      for (let i = teams.length - 1; i >= 0; i--) if (!teams[i].mons.length) teams.splice(i, 1);
+      if (!teams.length && left) {
+        setError("That team only has Pokémon you haven't unlocked.");
+        return;
+      }
+    }
     if (!teams.length) {
       setError(problems[0] || 'No team found. Paste a save code (it starts with CPV1.) or a team in Showdown text format.');
       return;
     }
-    onImport(teams, problems);
+    onImport(teams, problems, note);
   };
   return (
     <Sheet
@@ -204,11 +221,11 @@ export function TeamsPage({teams, setTeams, onEdit}) {
       {importing && (
         <ImportSheet
           onClose={() => setImporting(false)}
-          onImport={(imported, problems = []) => {
+          onImport={(imported, problems = [], note = '') => {
             setTeams([...teams, ...imported]);
             setImporting(false);
             setMessage(`Loaded ${imported.length} ${imported.length === 1 ? 'team' : 'teams'}: ${imported.map(t => t.name).join(', ')}.` +
-              (problems.length ? ` ${problems.length} code${problems.length === 1 ? '' : 's'} couldn't be read: ${problems[0]}` : ''));
+              (problems.length ? ` ${problems.length} code${problems.length === 1 ? '' : 's'} couldn't be read: ${problems[0]}` : '') + note);
           }}
         />
       )}

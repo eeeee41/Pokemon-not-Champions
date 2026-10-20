@@ -4,7 +4,7 @@ import {
   dex, toID, isSelectableSpecies, speciesAbilities, inGame, emptySP, clampSP, spLimit,
 } from './dex.js';
 import {canLearn} from './learnsets.js';
-import {isCreatorSpecies} from './creator.js';
+import {isCreatorSpecies, creatorUnlocked} from './creator.js';
 import {
   STATS, STAT_LABELS, SP_TOTAL, SP_MAX, TEAM_SIZE, MAX_MOVES, LEVEL, IV, RULES, TERA_TYPES,
 } from './constants.js';
@@ -114,9 +114,19 @@ export function validateMon(mon) {
 }
 
 /** {ok, problems: [{index, text}]} where index is the team slot or null for team-wide problems. */
-export function validateTeam(team) {
+/**
+ * Checks a team against the rules. MissingNo. is only allowed where it has been
+ * unlocked; pass {creator: true} for an opponent's team, which was checked on
+ * their side.
+ */
+export function validateTeam(team, {creator = creatorUnlocked()} = {}) {
   const problems = [];
   const mons = team?.mons || [];
+  if (!creator) {
+    mons.forEach((mon, index) => {
+      if (isCreatorSpecies(mon.species)) problems.push({index, text: 'This Pokémon is locked.'});
+    });
+  }
   if (mons.length !== TEAM_SIZE) {
     problems.push({index: null, text: `A team needs ${TEAM_SIZE} Pokémon; this one has ${mons.length}.`});
   }

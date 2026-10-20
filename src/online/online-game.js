@@ -167,7 +167,7 @@ export class OnlineGame {
       } catch {
         team = null;
       }
-      if (!team || !validateTeam(team).ok) {
+      if (!team || !validateTeam(team, {creator: true}).ok) {
         if (i === this.opp) {
           await this.writeResult({winner: this.side, reason: 'illegal'});
           return;
