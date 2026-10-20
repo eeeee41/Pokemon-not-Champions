@@ -1,9 +1,10 @@
 // Editing one team: six slots, and a full editor for the selected Pokémon.
 import {useState} from 'preact/hooks';
 import {
-  dex, toID, natures, speciesAbilities, calcStats, itemGimmick, clampSP, megaOptions, megaName,
+  dex, toID, natures, speciesAbilities, calcStats, itemGimmick, clampSP, megaOptions, megaName, spLimit,
 } from '../engine/dex.js';
 import {canLearn} from '../engine/learnsets.js';
+import {isCreatorSpecies} from '../engine/creator.js';
 import {
   validateTeam, validateMon, newMon, spUsed, requiredItems, cleanName,
 } from '../engine/team.js';
@@ -104,7 +105,8 @@ function StatsCard({mon, onChange}) {
   const stats = calcStats(mon.species, mon.sp, mon.nature);
   const nature = dex.natures.get(mon.nature);
   const used = spUsed(mon);
-  const left = SP_TOTAL - used;
+  const limit = spLimit(mon.species);
+  const left = limit - used;
   const setSP = (stat, raw) => {
     const current = mon.sp[stat] || 0;
     let v = clampSP(raw);
@@ -125,8 +127,8 @@ function StatsCard({mon, onChange}) {
       </label>
       <div class="sp-meter" aria-live="polite">
         <span class="eyebrow" style={{whiteSpace: 'nowrap'}}>Stat points</span>
-        <div class={`sp-meter-bar${used > SP_TOTAL ? ' over' : ''}`}><span style={{width: `${Math.min(100, (used / SP_TOTAL) * 100)}%`}} /></div>
-        <b class="num">{left}</b><span class="muted" style={{fontSize: '.85rem'}}>left of {SP_TOTAL}</span>
+        <div class={`sp-meter-bar${used > limit ? ' over' : ''}`}><span style={{width: `${Math.min(100, (used / limit) * 100)}%`}} /></div>
+        <b class="num">{left}</b><span class="muted" style={{fontSize: '.85rem'}}>left of {limit}</span>
       </div>
       <div style={{overflowX: 'auto'}}>
         <table class="stats-table">
@@ -191,7 +193,7 @@ function MonEditor({mon, index, onChange, onRemove, takenItems}) {
     onChange(applyExtra({
       ...fresh,
       nickname: '',
-      sp: mon.sp,
+      sp: isCreatorSpecies(s) || isCreatorSpecies(mon.species) ? fresh.sp : mon.sp,
       nature: mon.nature,
       item: keepItem,
       moves: mon.moves.map(m => (m && canLearn(name, m) ? m : '')),

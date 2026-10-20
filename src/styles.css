@@ -254,6 +254,7 @@ a { color: var(--gold-ink); }
   line-height: 1.5;
 }
 .type-sm { min-width: 0; padding: 0 6px; font-size: .68rem; }
+.types { display: inline-flex; flex-wrap: wrap; gap: 4px; max-width: 100%; }
 .t-stellar.type { background: linear-gradient(90deg, #e95a5a, #f2c014, #3fa94f, #2f80ec, #9145c8); }
 
 .gimmick-badge {
@@ -270,6 +271,7 @@ a { color: var(--gold-ink); }
 
 .error-list { margin: 0; padding-left: 18px; color: var(--bad); font-size: .9rem; display: grid; gap: 2px; }
 .notice { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: .9rem; }
+.creator-notice { background: linear-gradient(90deg, rgba(120, 236, 255, .18), rgba(255, 70, 196, .18)); border: 1px solid rgba(255, 70, 196, .45); font-weight: 600; }
 
 /* ---------- Sprites ---------- */
 .sprite { display: inline-block; background-repeat: no-repeat; image-rendering: pixelated; flex: none; }

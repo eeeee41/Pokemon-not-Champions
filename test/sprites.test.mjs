@@ -10,6 +10,7 @@ const manifest = JSON.parse(fs.readFileSync(new URL('../src/generated/sprites.js
 test('every Mega has its own front and back sprite', () => {
   const missing = [];
   for (const s of selectableSpecies()) {
+    if (s.id === 'missingno') continue; // drawn from its own sheet (see creator.test.mjs)
     for (const o of megaOptions(s.name)) {
       const id = toID(o.mega);
       if (!manifest.front.sprites[id]) missing.push(`${o.mega} (front)`);
@@ -21,6 +22,7 @@ test('every Mega has its own front and back sprite', () => {
 
 test('every Gigantamax forme has its own front sprite', () => {
   const missing = selectableSpecies()
+    .filter(s => s.id !== 'missingno')
     .filter(s => s.canGigantamax)
     .map(s => dex.species.get(`${s.name}-Gmax`))
     .filter(g => g.exists && !manifest.front.sprites[g.id] && g.id !== 'toxtricitylowkeygmax')

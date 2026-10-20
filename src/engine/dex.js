@@ -1,6 +1,7 @@
 // Pokémon data: species, moves, items, natures from Pokémon Showdown's simulator data.
 import {Dex, toID} from '@pkmn/sim';
-import {STATS, SP_MAX} from './constants.js';
+import {STATS, SP_MAX, SP_TOTAL} from './constants.js';
+import {isCreatorSpecies, CREATOR_SP_TOTAL} from './creator.js'; // adds MissingNo. to the data
 
 export const dex = Dex.forGen(9);
 export {toID};
@@ -147,4 +148,9 @@ export function megaOptions(speciesName) {
 /** "Charizard-Mega-X" → "Mega Charizard X". */
 export function megaName(formeName) {
   return String(formeName).replace(/^(.*?)-Mega(?:-([A-Z]))?$/, (_, base, v) => `Mega ${base}${v ? ` ${v}` : ''}`);
+}
+
+/** How many stat points a Pokémon gets: 66, or 192 for the creator's MissingNo. */
+export function spLimit(species) {
+  return isCreatorSpecies(species) ? CREATOR_SP_TOTAL : SP_TOTAL;
 }

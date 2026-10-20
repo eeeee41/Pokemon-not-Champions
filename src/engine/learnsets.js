@@ -1,6 +1,7 @@
 // Decodes the compact learnsets built by scripts/build-data.mjs.
 import data from '../generated/learnsets.json' with {type: 'json'};
-import {dex, toID} from './dex.js';
+import {dex, toID, inGame} from './dex.js';
+import {CREATOR_ID} from './creator.js';
 
 const cache = new Map();
 
@@ -23,6 +24,12 @@ function decode(speciesId) {
 /** Move ids a selectable species can learn (sorted by id). Unknown species → []. */
 export function learnableMoveIds(species) {
   const id = toID(species);
+  if (id === CREATOR_ID && !cache.has(id)) {
+    // MissingNo. learns everything.
+    cache.set(id, dex.moves.all()
+      .filter(m => inGame(m) && !m.isZ && !m.isMax && m.id !== 'struggle' && !m.realMove)
+      .map(m => m.id).sort());
+  }
   if (!cache.has(id)) cache.set(id, decode(id) || []);
   return cache.get(id);
 }

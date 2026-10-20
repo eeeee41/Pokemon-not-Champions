@@ -1,6 +1,7 @@
 // Searchable pickers for species, items and moves, shown in a sheet.
 import {useEffect, useMemo, useRef, useState} from 'preact/hooks';
 import {dex, toID, selectableSpecies, selectableItems, itemGimmick, megaOptions, megaName} from '../engine/dex.js';
+import {isCreatorSpecies, creatorUnlocked, tryCreatorCode} from '../engine/creator.js';
 import {learnableMoves} from '../engine/learnsets.js';
 import {TYPES, STATS} from '../engine/constants.js';
 import {requiredItems} from '../engine/team.js';
@@ -85,12 +86,26 @@ export function SpeciesPicker({onPick, onClose, current}) {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [show, setShow] = useState('all');
+  const [creator, setCreator] = useState(creatorUnlocked);
+  const [justUnlocked, setJustUnlocked] = useState(false);
   const input = useSearchInput();
-  const all = selectableSpecies();
+  // The secret phrase, typed into the search box, unlocks MissingNo.
+  const search = text => {
+    setQ(text);
+    if (!creator && text.length > 30) {
+      tryCreatorCode(text).then(ok => {
+        if (!ok) return;
+        setCreator(true);
+        setJustUnlocked(true);
+        setQ('MissingNo');
+      });
+    }
+  };
+  const all = selectableSpecies().filter(s => creator || !isCreatorSpecies(s));
   const results = useMemo(() => {
     const id = toID(q);
     const typeOk = types => !type || types.includes(type);
-    let specials = getSpecialRows().filter(r => typeOk(r.forme.types));
+    let specials = getSpecialRows().filter(r => typeOk(r.forme.types) && (creator || !isCreatorSpecies(r.base)));
     if (show === 'mega') specials = specials.filter(r => r.kind === 'mega');
     if (show === 'gmax') specials = specials.filter(r => r.kind === 'gmax');
     if (show !== 'all') {
@@ -107,13 +122,13 @@ export function SpeciesPicker({onPick, onClose, current}) {
     }
     const extra = specials.filter(r => r.ids.some(x => x.includes(id)));
     return [...starts, ...contains, ...extra];
-  }, [q, type, show]);
+  }, [q, type, show, creator]);
   return (
     <Sheet
       title="Choose a Pokémon"
       onClose={onClose}
       tools={<>
-        <input ref={input} id="species-search" class="input" placeholder="Search: Garchomp, Mega Charizard, 445…" value={q} onInput={e => setQ(e.currentTarget.value)} />
+        <input ref={input} id="species-search" class="input" placeholder="Search: Garchomp, Mega Charizard, 445…" value={q} onInput={e => search(e.currentTarget.value)} />
         <select id="species-show" class="select" style={{flex: '0 1 170px'}} value={show} onChange={e => setShow(e.currentTarget.value)} aria-label="Show">
           <option value="all">All Pokémon</option>
           <option value="mega">Mega Evolutions</option>
@@ -126,6 +141,7 @@ export function SpeciesPicker({onPick, onClose, current}) {
       </>}
     >
       <div class="pick-list" role="listbox" aria-label="Pokémon">
+        {justUnlocked && <p class="notice creator-notice" role="status">Creator mode unlocked. MissingNo. is yours to use.</p>}
         {show === 'mega' && <p class="pick-more" style={{textAlign: 'left'}}>Picking a Mega adds the Pokémon holding its Mega Stone. In battle, turn on Mega Evolve before choosing a move.</p>}
         {show === 'gmax' && <p class="pick-more" style={{textAlign: 'left'}}>Picking one adds the Pokémon with Gigantamax switched on. In battle, choose Gigantamax before a move.</p>}
         {results.slice(0, LIMIT).map(row => {
@@ -181,7 +197,8 @@ export function ItemPicker({species, onPick, onClose, current}) {
   const input = useSearchInput();
   const s = dex.species.get(species);
   const required = requiredItems(s);
-  const all = selectableItems();
+  // MissingNite stays hidden from everyone but MissingNo.
+  const all = isCreatorSpecies(s) ? selectableItems() : selectableItems().filter(i => i.id !== 'missingnite');
   const featured = useMemo(() => {
     if (required.length) return required.map(n => dex.items.get(n));
     return all.filter(item => {

@@ -39,6 +39,11 @@ export function applySimPatches() {
   const getDynamaxRequest = Pokemon.prototype.getDynamaxRequest;
   Pokemon.prototype.getDynamaxRequest = function (skipChecks) {
     if (!skipChecks && this.terastallized) return undefined;
+    // The creator's MissingNo. may Mega Evolve and Gigantamax in the same battle.
+    if (!skipChecks && this.baseSpecies.baseSpecies === 'MissingNo.') {
+      if (!this.side.canDynamaxNow()) return undefined;
+      return getDynamaxRequest.call(this, true);
+    }
     return getDynamaxRequest.call(this, skipChecks);
   };
 

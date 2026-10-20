@@ -1,6 +1,8 @@
 // Sprite sheets built by scripts/build-sprites.py.
 import manifest from '../generated/sprites.json';
+import creatorSprites from '../generated/creator-sprites.json';
 import {dex, toID} from '../engine/dex.js';
+import {isCreatorSpecies} from '../engine/creator.js';
 
 export const ASSET_BASE = 'assets/';
 
@@ -51,13 +53,20 @@ function resolve(sheet, name, exact = true) {
  * mirrored shiny front beats a normal-colored back.
  */
 export function spriteInfo(name, back = false, shiny = false) {
+  if (isCreatorSpecies(name)) {
+    const id = toID(name);
+    const sheet = `${back ? 'back' : 'front'}${shiny ? '-shiny' : ''}`;
+    const table = creatorSprites.sheets[sheet];
+    const rect = table[id] || table.missingno;
+    return {sheet, file: creatorSprites.file, size: creatorSprites.size, rect, flip: false};
+  }
   const shines = shiny ? [['back-shiny', 'front-shiny'], ['back', 'front']] : [['back', 'front']];
   for (const exact of [true, false]) {
     for (const [backSheet, frontSheet] of shines) {
       const steps = back ? [[backSheet, false], [frontSheet, true]] : [[frontSheet, false]];
       for (const [sheet, flip] of steps) {
         const id = resolve(sheet, name, exact);
-        if (id) return {sheet, rect: manifest[sheet].sprites[id], flip};
+        if (id) return {sheet, file: manifest[sheet].file, size: manifest[sheet].size, rect: manifest[sheet].sprites[id], flip};
       }
     }
   }
@@ -79,9 +88,8 @@ export function spriteStyle(name, back = false, scale = 1, mask = false, shiny =
   const info = spriteInfo(name, back, shiny);
   if (!info) return null;
   const [x, y, w, h] = info.rect;
-  const sheet = manifest[info.sheet];
-  const [W, H] = sheet.size;
-  const url = `url(${assetUrl(sheet.file)})`;
+  const [W, H] = info.size;
+  const url = `url(${assetUrl(info.file)})`;
   const pos = `${-x * scale}px ${-y * scale}px`;
   const size = `${W * scale}px ${H * scale}px`;
   const style = {width: `${w * scale}px`, height: `${h * scale}px`};
@@ -149,5 +157,5 @@ export function TypeBadge({type, small = false}) {
 }
 
 export function Types({types, small = false}) {
-  return <span style={{display: 'inline-flex', gap: '4px'}}>{types.map(t => <TypeBadge key={t} type={t} small={small} />)}</span>;
+  return <span class="types">{types.map(t => <TypeBadge key={t} type={t} small={small} />)}</span>;
 }

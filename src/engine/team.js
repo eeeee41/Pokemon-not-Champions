@@ -1,9 +1,10 @@
 // Teams: the saved format, validation against the Champions rules, conversion to
 // simulator sets, and import/export in Pokémon Showdown's text format.
 import {
-  dex, toID, isSelectableSpecies, speciesAbilities, inGame, emptySP, clampSP,
+  dex, toID, isSelectableSpecies, speciesAbilities, inGame, emptySP, clampSP, spLimit,
 } from './dex.js';
 import {canLearn} from './learnsets.js';
+import {isCreatorSpecies} from './creator.js';
 import {
   STATS, STAT_LABELS, SP_TOTAL, SP_MAX, TEAM_SIZE, MAX_MOVES, LEVEL, IV, RULES, TERA_TYPES,
 } from './constants.js';
@@ -39,7 +40,8 @@ export function newMon(speciesName) {
     shiny: false,
     gender: '',
     moves: ['', '', '', ''],
-    sp: emptySP(),
+    // MissingNo. starts with every stat maxed.
+    sp: isCreatorSpecies(s) ? {hp: 32, atk: 32, def: 32, spa: 32, spd: 32, spe: 32} : emptySP(),
   };
 }
 
@@ -106,7 +108,8 @@ export function validateMon(mon) {
     }
     total += v;
   }
-  if (total > SP_TOTAL) problems.push(`${label} uses ${total} stat points; the limit is ${SP_TOTAL}.`);
+  const limit = spLimit(species);
+  if (total > limit) problems.push(`${label} uses ${total} stat points; the limit is ${limit}.`);
   return problems;
 }
 
@@ -204,7 +207,7 @@ const STAT_ALIASES = {
   spe: 'spe', speed: 'spe',
 };
 
-function parseSpread(text, fromEVs) {
+function parseSpread(text, fromEVs, limit = SP_TOTAL) {
   const sp = emptySP();
   for (const part of text.split('/')) {
     const m = part.trim().match(/^(\d+)\s+(.+)$/);
@@ -215,7 +218,7 @@ function parseSpread(text, fromEVs) {
     sp[stat] = clampSP(fromEVs ? Math.round(n / 8) : n);
   }
   // EV spreads can round up past the limit; trim the largest stats back.
-  let over = STATS.reduce((a, s) => a + sp[s], 0) - SP_TOTAL;
+  let over = STATS.reduce((a, s) => a + sp[s], 0) - limit;
   while (over > 0) {
     const biggest = STATS.reduce((a, s) => (sp[s] > sp[a] ? s : a), 'hp');
     sp[biggest]--;
@@ -277,9 +280,9 @@ function parseMonBlock(block) {
     } else if ((m = line.match(/^Shiny:\s*(.+)$/i))) {
       mon.shiny = /^y/i.test(m[1]);
     } else if ((m = line.match(/^SPs?:\s*(.+)$/i))) {
-      mon.sp = parseSpread(m[1], false);
+      mon.sp = parseSpread(m[1], false, spLimit(species.exists ? species.name : speciesName));
     } else if ((m = line.match(/^EVs:\s*(.+)$/i))) {
-      mon.sp = parseSpread(m[1], true);
+      mon.sp = parseSpread(m[1], true, spLimit(species.exists ? species.name : speciesName));
     } else if ((m = line.match(/^(\w+)\s+Nature$/i))) {
       const n = dex.natures.get(m[1]);
       if (n.exists) mon.nature = n.name;
