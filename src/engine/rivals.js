@@ -1,6 +1,7 @@
 // The rivals you can battle against the computer: each one's Pokémon from
 // their strongest battle in the games (filled out to six from their other
 // battles where needed), on competitive sets for Champions rules.
+import {setRivalIds} from './creator.js';
 import {importTeams} from './team.js';
 
 export const RIVALS = [
@@ -1367,6 +1368,8 @@ export function rivalTeams() {
   }
   return built;
 }
+
+setRivalIds(RIVALS.map(r => r.id));
 
 /** Has every rival been beaten on this difficulty? `wins` is {rivalId: [levels]}. */
 export function beatEveryRival(wins, level = 'champion') {

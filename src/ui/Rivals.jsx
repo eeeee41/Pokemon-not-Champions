@@ -1,7 +1,7 @@
 // Battle the rivals from every generation against the computer (Singles).
 import {validateTeam} from '../engine/team.js';
 import {RIVALS, rivalTeams} from '../engine/rivals.js';
-import {creatorUnlocked} from '../engine/creator.js';
+import {creatorUnlocked, championWins} from '../engine/creator.js';
 import {LEVELS} from '../engine/bot.js';
 import {TeamOption} from './Setup.jsx';
 import {FitSprite} from './sprites.jsx';
@@ -32,7 +32,7 @@ export function RivalsPage({teams, settings, setSettings, onBattle, onTeams}) {
           <h1>Beat every rival</h1>
           <p class="muted">The rivals from every generation, with their teams from their toughest battles, on competitive sets.</p>
           {!creatorUnlocked() && (
-            <p class="muted secret-hint">Beat all {RIVALS.length} on Champion difficulty to unlock a secret ({RIVALS.filter(r => wins[r.id]?.includes('champion')).length} / {RIVALS.length} so far).</p>
+            <p class="muted secret-hint">Beat all {RIVALS.length} on Champion difficulty to unlock a secret ({championWins().length} / {RIVALS.length} so far).</p>
           )}
         </div>
         <span class="chip chip-gold" title="Rivals beaten on this difficulty">{beaten} / {RIVALS.length} beaten on {LEVELS[level].label}</span>

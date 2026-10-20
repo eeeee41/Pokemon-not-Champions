@@ -76,6 +76,29 @@ test('locked until all six parts are found, one per page', () => {
   assert.ok(validateTeam(team()).ok, validateTeam(team()).problems.map(p => p.text).join('; '));
 });
 
+test('faked or copied parts do not count', () => {
+  const store = new Map();
+  globalThis.localStorage = {getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k)};
+  try {
+    resetParts();
+    store.set('champions-pvp.megatron.v1', JSON.stringify(PARTS.map(p => p.id)));
+    store.set('champions-pvp.megatron.v2', JSON.stringify(Object.fromEntries(PARTS.map(p => [p.id, '0'.repeat(64)]))));
+    assert.deepEqual(collectedParts(), []);
+    assert.equal(megatronUnlocked(), false);
+    resetParts();
+    for (const p of PARTS) collectPart(p.id);
+    assert.equal(megatronUnlocked(), true);
+    const saved = store.get('champions-pvp.megatron.v2');
+    store.clear(); // another browser: its own device id
+    store.set('champions-pvp.megatron.v2', saved);
+    assert.equal(megatronUnlocked(), false);
+  } finally {
+    delete globalThis.localStorage;
+  }
+  // Back to this visit's parts for the tests below.
+  for (const p of PARTS) collectPart(p.id);
+});
+
 test('his moves work as described, and his team survives a save code', () => {
   const back = decodeTeam(encodeTeam(team())).mons[0];
   assert.equal(back.species, 'Megatron');

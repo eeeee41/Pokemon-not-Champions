@@ -10,8 +10,8 @@ import {BattleScreen} from './Battle.jsx';
 import {OnlinePage, InviteBanner, onlineTeam} from './Online.jsx';
 import {RivalsPage} from './Rivals.jsx';
 import {BotGame} from './bot-game.js';
-import {rivalTeams, beatEveryRival} from '../engine/rivals.js';
-import {creatorUnlocked, unlockByRivals} from '../engine/creator.js';
+import {rivalTeams} from '../engine/rivals.js';
+import {creatorUnlocked, recordChampionWin} from '../engine/creator.js';
 import {HiddenPart, PartsCounter, PartsToast} from './MegatronHunt.jsx';
 import {LocalGame} from './local-game.js';
 import {OnlineSession} from './online-session.js';
@@ -57,14 +57,8 @@ export function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
-  // Beating every rival on Champion unlocks MissingNo.
+  // Beating every rival on Champion unlocks MissingNo. (see startBot).
   const [secret, setSecret] = useState(false);
-  useEffect(() => {
-    if (beatEveryRival(settings.rivalWins) && !creatorUnlocked()) {
-      unlockByRivals();
-      setSecret(true);
-    }
-  }, [settings.rivalWins]);
 
   const go = r => {
     setRoute(r);
@@ -110,6 +104,11 @@ export function App() {
     next.subscribe(() => {
       if (counted || next.phase.type !== 'over' || next.phase.winner !== 0) return;
       counted = true;
+      if (level === 'champion') {
+        const before = creatorUnlocked();
+        recordChampionWin(rival.id);
+        if (!before && creatorUnlocked()) setSecret(true);
+      }
       setSettings(prev => {
         const wins = {...(prev.rivalWins || {})};
         wins[rival.id] = [...new Set([...(wins[rival.id] || []), level])];

@@ -250,27 +250,38 @@ test('every move MissingNo. knows fits in a save code and comes back', () => {
   }
 });
 
-test('beating every rival on Champion unlocks MissingNo. (but not Glitched Power)', async () => {
+test('beating every rival on Champion unlocks MissingNo. (but not Glitched Power); faked wins do not', async () => {
   const {RIVALS, beatEveryRival} = await import('../src/engine/rivals.js');
-  const {unlockByRivals} = await import('../src/engine/creator.js');
+  const {recordChampionWin, championWins, resetChampionWins} = await import('../src/engine/creator.js');
   const all = Object.fromEntries(RIVALS.map(r => [r.id, ['normal', 'champion']]));
-  const missingOne = {...all, [RIVALS[5].id]: ['normal', 'hard']};
   assert.equal(beatEveryRival(all), true);
-  assert.equal(beatEveryRival(missingOne), false);
-  assert.equal(beatEveryRival({}), false);
-  assert.equal(beatEveryRival(Object.fromEntries(RIVALS.map(r => [r.id, ['hard']]))), false);
+  assert.equal(beatEveryRival({...all, [RIVALS[5].id]: ['hard']}), false);
 
   const store = fakeStorage();
   lockCreator();
   try {
     assert.equal(creatorUnlocked(), false);
-    unlockByRivals();
+    // Faked saves: wins in the settings, a made-up win list, the old flag.
+    store.set('champions-pvp.settings.v1', JSON.stringify({rivalWins: all}));
+    store.set('champions-pvp.rivalwins.v1', JSON.stringify(Object.fromEntries(RIVALS.map(r => [r.id, 'x'.repeat(64)]))));
+    store.set('champions-pvp.creator.rivals.v1', 'beat every rival on champion');
+    assert.equal(creatorUnlocked(), false);
+    assert.deepEqual(championWins(), []);
+    resetChampionWins();
+    for (const r of RIVALS.slice(0, -1)) recordChampionWin(r.id);
+    recordChampionWin('not-a-rival');
+    assert.equal(championWins().length, RIVALS.length - 1);
+    assert.equal(creatorUnlocked(), false);
+    recordChampionWin(RIVALS.at(-1).id);
     assert.equal(creatorUnlocked(), true);
     lockCreator();
     assert.equal(creatorUnlocked(), true, 'remembered in this browser');
     assert.ok(validateTeam(teamWithMissingNo()).ok);
     assert.equal(glitchedPowerUnlocked(), false);
+    // Copying the wins to another browser (a different device id) doesn't carry them over.
+    const wins = store.get('champions-pvp.rivalwins.v1');
     store.clear();
+    store.set('champions-pvp.rivalwins.v1', wins);
     assert.equal(creatorUnlocked(), false);
   } finally {
     lockCreator();

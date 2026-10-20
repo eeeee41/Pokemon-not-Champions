@@ -9,6 +9,7 @@
 //   HP or less, and allied Steel-types' Attack and Sp. Atk get 1.3x in Doubles.
 //   Signature moves Fusion Cannon and Peace Through Tyranny.
 import {Dex} from '@pkmn/sim';
+import {sealedIds, recordSealed, clearSealed} from './seal.js';
 
 export const MEGATRON = 'Megatron';
 export const MEGATRON_ID = 'megatron';
@@ -121,23 +122,14 @@ export const PARTS = [
   {id: 'chassis', name: 'Chassis', page: 'teams'},
   {id: 'legs', name: 'Legs', page: 'editor'},
 ];
-const PARTS_KEY = 'champions-pvp.megatron.v1';
+// Found parts are sealed (see seal.js): editing the saved list doesn't add any.
+const PARTS_KEY = 'champions-pvp.megatron.v2';
+const KIND = 'megatron-part';
 const listeners = new Set();
-let memory = null; // used when the browser won't save
-
-function load() {
-  if (memory) return memory;
-  try {
-    const raw = JSON.parse(globalThis.localStorage?.getItem(PARTS_KEY) || '[]');
-    return Array.isArray(raw) ? raw.filter(id => PARTS.some(p => p.id === id)) : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Ids of the parts found in this browser. */
 export function collectedParts() {
-  return [...new Set(load())];
+  return sealedIds(KIND, PARTS_KEY).filter(id => PARTS.some(p => p.id === id));
 }
 
 export function megatronUnlocked() {
@@ -147,18 +139,10 @@ export function megatronUnlocked() {
 /** Collects a part. Returns how many are found now. */
 export function collectPart(id) {
   if (!PARTS.some(p => p.id === id)) return collectedParts().length;
-  const parts = [...new Set([...load(), id])];
-  memory = parts;
-  try {
-    if (globalThis.localStorage) {
-      globalThis.localStorage.setItem(PARTS_KEY, JSON.stringify(parts));
-      memory = null;
-    }
-  } catch {
-    // Kept for this visit only.
-  }
-  for (const fn of listeners) fn(parts.length, id);
-  return parts.length;
+  recordSealed(KIND, PARTS_KEY, id);
+  const count = collectedParts().length;
+  for (const fn of listeners) fn(count, id);
+  return count;
 }
 
 /** Calls fn(count, partId) whenever a part is collected; returns an unsubscribe function. */
@@ -169,10 +153,5 @@ export function onPartsChange(fn) {
 
 /** Forgets the parts (for tests). */
 export function resetParts() {
-  memory = null;
-  try {
-    globalThis.localStorage?.removeItem(PARTS_KEY);
-  } catch {
-    // nothing saved
-  }
+  clearSealed(PARTS_KEY);
 }
