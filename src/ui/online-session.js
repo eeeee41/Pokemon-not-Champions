@@ -105,9 +105,21 @@ export class OnlineSession {
     this.set({task: null, taskError: friendlyError(err)});
   }
 
+  /** The team's save code, or null (with the reason shown) if it can't be made. */
+  teamCode(team) {
+    try {
+      return codeFor(team);
+    } catch (err) {
+      console.error('Could not make a save code for this team', err);
+      this.set({taskError: "This team couldn't be sent. Try another team, or edit this one and try again."});
+      return null;
+    }
+  }
+
   quickMatch(mode, team) {
     if (!this.ready) return;
-    const teamCode = codeFor(team);
+    const teamCode = this.teamCode(team);
+    if (!teamCode) return;
     this.set({taskError: '', notice: ''});
     const handle = this.lobby.quickMatch(mode, teamCode, {
       onMatch: info => this.matched(info, teamCode),
@@ -121,7 +133,8 @@ export class OnlineSession {
 
   async hostRoom(mode, team) {
     if (!this.ready || this.state.busy) return;
-    const teamCode = codeFor(team);
+    const teamCode = this.teamCode(team);
+    if (!teamCode) return;
     this.set({busy: true, taskError: '', notice: ''});
     try {
       const handle = await this.lobby.hostRoom(mode, teamCode, {
@@ -138,7 +151,8 @@ export class OnlineSession {
 
   async joinRoom(text, team) {
     if (!this.ready || this.state.busy) return false;
-    const teamCode = codeFor(team);
+    const teamCode = this.teamCode(team);
+    if (!teamCode) return false;
     this.set({busy: true, taskError: '', notice: ''});
     try {
       const info = await this.lobby.joinRoom(text, teamCode);
@@ -154,7 +168,8 @@ export class OnlineSession {
 
   async challenge(player, mode, team) {
     if (!this.ready || this.state.busy) return;
-    const teamCode = codeFor(team);
+    const teamCode = this.teamCode(team);
+    if (!teamCode) return;
     this.set({busy: true, taskError: '', notice: ''});
     try {
       const handle = await this.lobby.challenge(player.uid, mode, teamCode, {
@@ -213,7 +228,9 @@ export class OnlineSession {
   rejoin(team) {
     const info = this.state.rejoin;
     if (!info || !this.ready) return;
-    this.matched(info, team ? codeFor(team) : null);
+    const teamCode = team ? this.teamCode(team) : null;
+    if (team && !teamCode) return;
+    this.matched(info, teamCode);
   }
 
   async forfeitRejoin() {

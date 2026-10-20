@@ -236,3 +236,16 @@ test('Glitched Power raises every stat, accuracy and evasion by 6, and has 1 PP'
   assert.deepEqual(mn.boosts, {atk: 6, def: 6, spa: 6, spd: 6, spe: 6, accuracy: 6, evasion: 6});
   assert.ok(m.requests[0].active[0].moves.find(x => x.id === 'glitchedpower').disabled, 'out of PP');
 });
+
+test('every move MissingNo. knows fits in a save code and comes back', () => {
+  const ids = learnableMoveIds('MissingNo.');
+  assert.ok(ids.includes('glitchedpower'));
+  const base = importTeams(SET)[0].mons[0];
+  for (let i = 0; i < ids.length; i += 24) {
+    const chunk = ids.slice(i, i + 24).map(id => dex.moves.get(id).name);
+    const mons = Array.from({length: 6}, (_, k) => ({...structuredClone(base), moves: [0, 1, 2, 3].map(j => chunk[k * 4 + j] || '')}));
+    const team = {name: 'Moves', mons};
+    const back = decodeTeam(encodeTeam(team));
+    assert.deepEqual(back.mons.map(m => m.moves), mons.map(m => m.moves), `moves ${i}–${i + 23}`);
+  }
+});

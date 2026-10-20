@@ -162,7 +162,7 @@ function install() {
   };
   // Its signature move, behind a second secret phrase.
   data.Moves.glitchedpower = {
-    num: 9002,
+    num: 1020, // save codes store move numbers in 10 bits, so it must stay under 1023
     accuracy: 100,
     basePower: 0,
     category: 'Status',
