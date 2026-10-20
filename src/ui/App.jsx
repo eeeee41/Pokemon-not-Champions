@@ -12,6 +12,7 @@ import {RivalsPage} from './Rivals.jsx';
 import {BotGame} from './bot-game.js';
 import {rivalTeams, beatEveryRival} from '../engine/rivals.js';
 import {creatorUnlocked, unlockByRivals} from '../engine/creator.js';
+import {HiddenPart, PartsCounter, PartsToast} from './MegatronHunt.jsx';
 import {LocalGame} from './local-game.js';
 import {OnlineSession} from './online-session.js';
 import {OnlineGame} from '../online/online-game.js';
@@ -229,6 +230,7 @@ export function App() {
             <span>Champions PvP</span>
             <small>Beta</small>
           </button>
+          <PartsCounter />
           <nav class="nav" aria-label="Main">
             <button aria-current={section === 'play' ? 'page' : undefined} onClick={() => go(localGame ? {name: 'battle'} : {name: 'setup'})}>
               {localGame ? 'Battle' : 'Play'}
@@ -244,6 +246,8 @@ export function App() {
         </div>
       </header>
       <main class="main">
+        <PartsToast />
+        <HiddenPart page={route.name === 'editor' && !teams.some(t => t.id === route.id) ? 'teams' : route.name} />
         {secret && (
           <div class="card notice creator-notice secret-unlock" role="status">
             <span>You beat every rival on Champion difficulty. <strong>MissingNo. is unlocked</strong>: search for it in the team builder.</span>

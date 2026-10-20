@@ -7,6 +7,7 @@ import {TEAM_SIZE} from '../engine/constants.js';
 import {FitSprite} from './sprites.jsx';
 import {Sheet} from './pickers.jsx';
 import {creatorUnlocked, isCreatorSpecies, glitchedPowerUnlocked, GLITCHED_POWER} from '../engine/creator.js';
+import {isMegatron, megatronUnlocked} from '../engine/megatron.js';
 import {toID} from '../engine/dex.js';
 
 export function TeamStrip({team, height = 52}) {
@@ -101,11 +102,12 @@ function ImportSheet({onImport, onClose}) {
       }
       if (dropped) note += ` Left out Glitched Power${dropped > 1 ? ` (${dropped} times)` : ''}: you haven't unlocked it.`;
     }
-    // MissingNo. only comes along where it has been unlocked.
-    if (!creatorUnlocked()) {
+    // MissingNo. and Megatron only come along where they have been unlocked.
+    const lockedMon = m => (!creatorUnlocked() && isCreatorSpecies(m.species)) || (!megatronUnlocked() && isMegatron(m.species));
+    if (teams.some(t => t.mons.some(lockedMon))) {
       let left = 0;
       for (const team of teams) {
-        const kept = team.mons.filter(m => !isCreatorSpecies(m.species));
+        const kept = team.mons.filter(m => !lockedMon(m));
         left += team.mons.length - kept.length;
         team.mons = kept;
       }

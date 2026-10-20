@@ -117,9 +117,9 @@ function getTables() {
   if (tables) return tables;
   const itemByNum = new Map(selectableItems().map(i => [i.num, i]));
   const moveByNum = new Map();
-  // MissingNo.'s moves first (it knows a few no one else does), then Smeargle's,
+  // MissingNo.'s and Megatron's moves first (they know a few no one else does), then Smeargle's,
   // which win wherever two moves share a number.
-  for (const id of learnableMoveIds('MissingNo.')) {
+  for (const id of [...learnableMoveIds('MissingNo.'), ...learnableMoveIds('Megatron')]) {
     const m = dex.moves.get(id);
     if (m.num > 0) moveByNum.set(m.num, m);
   }

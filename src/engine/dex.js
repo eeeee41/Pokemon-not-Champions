@@ -2,6 +2,7 @@
 import {Dex, toID} from '@pkmn/sim';
 import {STATS, SP_MAX, SP_TOTAL} from './constants.js';
 import {isCreatorSpecies, CREATOR_SP_TOTAL} from './creator.js'; // adds MissingNo. to the data
+import './megatron.js'; // adds Megatron to the data
 
 export const dex = Dex.forGen(9);
 export {toID};

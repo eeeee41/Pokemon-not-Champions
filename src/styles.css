@@ -271,6 +271,33 @@ a { color: var(--gold-ink); }
 
 .error-list { margin: 0; padding-left: 18px; color: var(--bad); font-size: .9rem; display: grid; gap: 2px; }
 .notice { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: .9rem; }
+/* The Megatron parts hunt */
+.main { position: relative; }
+.hidden-part {
+  position: absolute; z-index: 5; padding: 0; border: 0; background: none; cursor: pointer;
+  opacity: .82; animation: part-bob 3.2s ease-in-out infinite;
+}
+.hidden-part:hover, .hidden-part:focus-visible { opacity: 1; transform: scale(1.12); }
+@keyframes part-bob { 50% { translate: 0 -4px; } }
+@media (prefers-reduced-motion: reduce) { .hidden-part { animation: none; } }
+.hp-home { top: 4px; right: 8px; }
+.hp-setup { bottom: 6px; left: 8px; }
+.hp-rivals { bottom: 6px; right: 8px; }
+.hp-online { bottom: 6px; left: 8px; }
+.hp-teams { bottom: 6px; right: 8px; }
+.hp-editor { bottom: 6px; left: 8px; }
+.part-icon { display: inline-block; image-rendering: pixelated; flex: none; }
+.parts-counter {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border-radius: 999px;
+  background: rgba(168, 92, 255, .18); border: 1px solid rgba(168, 92, 255, .5); color: #e9dcff; font-weight: 700; font-size: .85rem;
+}
+.parts-toast {
+  position: fixed; z-index: 50; left: 50%; bottom: 20px; translate: -50% 0; width: min(520px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid rgba(168, 92, 255, .55); background: var(--surface, #fff); box-shadow: 0 10px 30px rgba(20, 16, 40, .25);
+}
+.parts-toast > span:not(.part-icon) { flex: 1; font-weight: 600; }
+.parts-toast.done { border-color: rgba(168, 92, 255, .9); background: linear-gradient(90deg, rgba(168, 92, 255, .14), rgba(96, 236, 255, .12)), var(--surface, #fff); }
 .secret-unlock { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .secret-hint { margin-top: 4px; font-size: .88rem; }
 .creator-notice { background: linear-gradient(90deg, rgba(120, 236, 255, .18), rgba(255, 70, 196, .18)); border: 1px solid rgba(255, 70, 196, .45); font-weight: 600; }

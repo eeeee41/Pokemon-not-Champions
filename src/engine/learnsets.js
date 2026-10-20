@@ -2,6 +2,7 @@
 import data from '../generated/learnsets.json' with {type: 'json'};
 import {dex, toID, inGame} from './dex.js';
 import {CREATOR_ID} from './creator.js';
+import {MEGATRON_ID, MEGATRON_MOVES, MEGATRON_SIGNATURES} from './megatron.js';
 
 const cache = new Map();
 
@@ -25,11 +26,12 @@ function decode(speciesId) {
 export function learnableMoveIds(species) {
   const id = toID(species);
   if (id === CREATOR_ID && !cache.has(id)) {
-    // MissingNo. learns everything.
+    // MissingNo. learns everything (except Megatron's own two moves).
     cache.set(id, dex.moves.all()
-      .filter(m => inGame(m) && !m.isZ && !m.isMax && m.id !== 'struggle' && !m.realMove)
+      .filter(m => inGame(m) && !m.isZ && !m.isMax && m.id !== 'struggle' && !m.realMove && !MEGATRON_SIGNATURES.includes(m.id))
       .map(m => m.id).sort());
   }
+  if (id === MEGATRON_ID && !cache.has(id)) cache.set(id, [...MEGATRON_MOVES].sort());
   if (!cache.has(id)) cache.set(id, decode(id) || []);
   return cache.get(id);
 }

@@ -2,6 +2,7 @@
 import {useEffect, useMemo, useRef, useState} from 'preact/hooks';
 import {dex, toID, selectableSpecies, selectableItems, itemGimmick, megaOptions, megaName} from '../engine/dex.js';
 import {isCreatorSpecies, creatorUnlocked, tryCreatorCode, tryUnlock, glitchedPowerUnlocked, GLITCHED_POWER} from '../engine/creator.js';
+import {isMegatron, megatronUnlocked} from '../engine/megatron.js';
 import {learnableMoves} from '../engine/learnsets.js';
 import {TYPES, STATS} from '../engine/constants.js';
 import {requiredItems} from '../engine/team.js';
@@ -101,7 +102,8 @@ export function SpeciesPicker({onPick, onClose, current}) {
       });
     }
   };
-  const all = selectableSpecies().filter(s => creator || !isCreatorSpecies(s));
+  const megatron = megatronUnlocked();
+  const all = selectableSpecies().filter(s => (creator || !isCreatorSpecies(s)) && (megatron || !isMegatron(s)));
   const results = useMemo(() => {
     const id = toID(q);
     const typeOk = types => !type || types.includes(type);

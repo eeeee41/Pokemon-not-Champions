@@ -3,6 +3,8 @@ import manifest from '../generated/sprites.json';
 import creatorSprites from '../generated/creator-sprites.json';
 import {dex, toID} from '../engine/dex.js';
 import {isCreatorSpecies} from '../engine/creator.js';
+import megatronSprites from '../generated/megatron-sprites.json';
+import {isMegatron} from '../engine/megatron.js';
 
 export const ASSET_BASE = 'assets/';
 
@@ -53,6 +55,10 @@ function resolve(sheet, name, exact = true) {
  * mirrored shiny front beats a normal-colored back.
  */
 export function spriteInfo(name, back = false, shiny = false) {
+  if (isMegatron(name)) {
+    const sheet = `${back ? 'back' : 'front'}${shiny ? '-shiny' : ''}`;
+    return {sheet, file: megatronSprites.file, size: megatronSprites.size, rect: megatronSprites.sheets[sheet].megatron, flip: false};
+  }
   if (isCreatorSpecies(name)) {
     const id = toID(name);
     const sheet = `${back ? 'back' : 'front'}${shiny ? '-shiny' : ''}`;
@@ -122,6 +128,21 @@ export function FitSprite({name, width = 56, height = 52, maxScale = 1, back = f
     <span class={`sprite-box ${cls}`} style={{width: `${width}px`, height: `${height}px`}} title={title}>
       <Sprite name={name} back={back} shiny={shiny} scale={scale} />
     </span>
+  );
+}
+
+/** One of Megatron's hidden parts. */
+export function PartIcon({part, size = 48}) {
+  const [x, y, w, h] = megatronSprites.parts[part];
+  const [W, H] = megatronSprites.size;
+  const scale = size / w;
+  return (
+    <span class="part-icon" aria-hidden="true" style={{
+      width: `${size}px`, height: `${h * scale}px`,
+      backgroundImage: `url(${assetUrl(megatronSprites.file)})`,
+      backgroundPosition: `${-x * scale}px ${-y * scale}px`,
+      backgroundSize: `${W * scale}px ${H * scale}px`,
+    }} />
   );
 }
 
