@@ -1,7 +1,7 @@
 // Searchable pickers for species, items and moves, shown in a sheet.
 import {useEffect, useMemo, useRef, useState} from 'preact/hooks';
 import {dex, toID, selectableSpecies, selectableItems, itemGimmick, megaOptions, megaName} from '../engine/dex.js';
-import {isCreatorSpecies, creatorUnlocked, tryCreatorCode} from '../engine/creator.js';
+import {isCreatorSpecies, creatorUnlocked, tryCreatorCode, tryUnlock, glitchedPowerUnlocked, GLITCHED_POWER} from '../engine/creator.js';
 import {learnableMoves} from '../engine/learnsets.js';
 import {TYPES, STATS} from '../engine/constants.js';
 import {requiredItems} from '../engine/team.js';
@@ -257,14 +257,28 @@ export function MovePicker({species, taken = [], onPick, onClose, current}) {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const input = useSearchInput();
-  const moves = useMemo(() => learnableMoves(species), [species]);
+  const [glitch, setGlitch] = useState(glitchedPowerUnlocked);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+  // Glitched Power, MissingNo.'s signature move, appears once its phrase is typed here.
+  const moves = useMemo(() => learnableMoves(species).filter(m => glitch || m.id !== GLITCHED_POWER), [species, glitch]);
+  const search = text => {
+    setQ(text);
+    if (!glitch && isCreatorSpecies(species) && text.length > 30) {
+      tryUnlock(text).then(name => {
+        if (name !== GLITCHED_POWER) return;
+        setGlitch(true);
+        setJustUnlocked(true);
+        setQ('Glitched Power');
+      });
+    }
+  };
   const results = useMemo(() => {
     const id = toID(q);
     let list = moves;
     if (type) list = list.filter(m => m.type === type);
     if (id) list = list.filter(m => m.id.includes(id));
     return list;
-  }, [q, type, species]);
+  }, [q, type, species, moves]);
   const takenIds = taken.map(t => toID(t));
   return (
     <Sheet
@@ -272,7 +286,7 @@ export function MovePicker({species, taken = [], onPick, onClose, current}) {
       wide
       onClose={onClose}
       tools={<>
-        <input ref={input} id="move-search" class="input" placeholder={`Search ${moves.length} moves`} value={q} onInput={e => setQ(e.currentTarget.value)} />
+        <input ref={input} id="move-search" class="input" placeholder={`Search ${moves.length} moves`} value={q} onInput={e => search(e.currentTarget.value)} />
         <select id="move-type" class="select" style={{flex: '0 1 160px'}} value={type} onChange={e => setType(e.currentTarget.value)}>
           <option value="">All types</option>
           {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -280,6 +294,7 @@ export function MovePicker({species, taken = [], onPick, onClose, current}) {
       </>}
     >
       <div class="pick-list">
+        {justUnlocked && <p class="notice creator-notice" role="status">Glitched Power unlocked. Every stat +6, once per battle.</p>}
         {current && !q && (
           <button class="pick-row move-row" onClick={() => onPick('')}>
             <span />

@@ -11,11 +11,13 @@
 //   attacks can hurt it. Mega ability Limitless: all that, its attacks never
 //   miss, and its stats can't be lowered. It can Mega Evolve and Gigantamax
 //   (G-Max Glitch) in the same battle.
+//   Signature move Glitched Power (behind a second phrase, typed into the move
+//   search): 1 PP, raises every stat, accuracy and evasion by 6.
 import {Dex} from '@pkmn/sim';
 
 export const CREATOR_SPECIES = 'MissingNo.';
 export const CREATOR_ID = 'missingno';
-const CODE_HASH = '0b8cdf286e6529a5e2d7a92fc0ef8fdc39e399f154b848d94a52c4c43aab0651';
+const CODE_HASH = '0b8cdf286e6529a5e2d7a92fc0ef8fdc39e399f154b848d94a52c4c43aab0651'; // MissingNo.'s phrase
 
 const ALL_TYPES = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground',
   'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
@@ -158,6 +160,26 @@ function install() {
     desc: 'If held by MissingNo., this item allows it to Mega Evolve in battle.',
     shortDesc: 'MissingNo.: Mega Evolves.',
   };
+  // Its signature move, behind a second secret phrase.
+  data.Moves.glitchedpower = {
+    num: 9002,
+    accuracy: 100,
+    basePower: 0,
+    category: 'Status',
+    name: 'Glitched Power',
+    pp: 1,
+    noPPBoosts: true,
+    priority: 0,
+    flags: {},
+    boosts: {atk: 6, def: 6, spa: 6, spd: 6, spe: 6, accuracy: 6, evasion: 6},
+    secondary: null,
+    target: 'self',
+    type: 'Normal',
+    gen: 9,
+    desc: 'MissingNo.\'s signature move. Raises every stat, accuracy and evasiveness by 6 stages. 1 PP.',
+    shortDesc: 'Raises every stat, accuracy and evasion by 6.',
+    contestType: 'Cool',
+  };
   data.Moves.gmaxglitch = {
     num: 9001,
     accuracy: true,
@@ -189,13 +211,25 @@ install();
 
 // ---------- unlocking ----------
 //
-// Typing the phrase stores a token made from the phrase itself. Only a hash of
-// that token is kept here, so the token can't be read out of the code or
+// Typing a secret phrase stores a token made from the phrase itself. Only a
+// hash of each token is kept here, so a token can't be read out of the code or
 // faked by editing the browser's saved data: it takes the phrase.
 
-const TOKEN_PREFIX = 'champions-pvp creator token|';
-const TOKEN_CHECK = '6ea042fe204b1d008f75be6077d66c5dad29a7b2ef34252a08b060109c65515f';
-const UNLOCK_KEY = 'champions-pvp.creator.v2';
+export const GLITCHED_POWER = 'glitchedpower';
+const LOCKS = {
+  [CREATOR_ID]: {
+    code: CODE_HASH,
+    prefix: 'champions-pvp creator token|',
+    check: '6ea042fe204b1d008f75be6077d66c5dad29a7b2ef34252a08b060109c65515f',
+    key: 'champions-pvp.creator.v2',
+  },
+  [GLITCHED_POWER]: {
+    code: 'cdf1e7e40125a2e306656760ed029347a28250a7bf0476690213667fab386a1c',
+    prefix: 'champions-pvp glitched power token|',
+    check: '68a0e9fdf450ca3bfae44b363f4fa68b0079bcc1aa824f11e3cade8fab2ac036',
+    key: 'champions-pvp.glitch.v1',
+  },
+};
 
 function normalize(text) {
   // "[secret phrase]" works as well as the phrase alone.
@@ -245,44 +279,63 @@ export function sha256(text) {
   return [...h].map(x => x.toString(16).padStart(8, '0')).join('');
 }
 
-let session = false; // unlocked this visit, even if the browser won't save it
-let checked = null;
+const session = new Set(); // unlocked this visit, even if the browser won't save it
+const checked = new Map();
 
-/** Has this browser been unlocked with the phrase? */
-export function creatorUnlocked() {
-  if (session) return true;
+/** Has this browser unlocked `name` (MissingNo. or Glitched Power) with its phrase? */
+export function isUnlocked(name) {
+  const lock = LOCKS[name];
+  if (!lock) return false;
+  if (session.has(name)) return true;
   let token = null;
   try {
-    token = globalThis.localStorage?.getItem(UNLOCK_KEY) ?? null;
+    token = globalThis.localStorage?.getItem(lock.key) ?? null;
   } catch {
     token = null;
   }
   if (!token) return false;
-  if (checked?.token !== token) checked = {token, ok: sha256(token) === TOKEN_CHECK};
-  return checked.ok;
+  if (checked.get(name)?.token !== token) checked.set(name, {token, ok: sha256(token) === lock.check});
+  return checked.get(name).ok;
 }
 
-/** True (and remembered in this browser) when `text` is the secret phrase. */
-export async function tryCreatorCode(text) {
+export function creatorUnlocked() {
+  return isUnlocked(CREATOR_ID);
+}
+
+export function glitchedPowerUnlocked() {
+  return isUnlocked(GLITCHED_POWER);
+}
+
+/** Unlocks whatever `text` is the phrase for, and says which ('missingno', 'glitchedpower') or null. */
+export async function tryUnlock(text) {
   const clean = normalize(text);
-  if (clean.split(' ').length < 6) return false;
-  if (sha256(clean) !== CODE_HASH) return false;
-  const token = sha256(TOKEN_PREFIX + clean);
-  if (sha256(token) !== TOKEN_CHECK) return false;
-  session = true;
-  try {
-    globalThis.localStorage?.setItem(UNLOCK_KEY, token);
-    globalThis.localStorage?.removeItem('champions-pvp.creator.v1');
-  } catch {
-    // Unlocked for this visit only.
+  if (clean.split(' ').length < 6) return null;
+  const hash = sha256(clean);
+  for (const [name, lock] of Object.entries(LOCKS)) {
+    if (hash !== lock.code) continue;
+    const token = sha256(lock.prefix + clean);
+    if (sha256(token) !== lock.check) return null;
+    session.add(name);
+    try {
+      globalThis.localStorage?.setItem(lock.key, token);
+      if (name === CREATOR_ID) globalThis.localStorage?.removeItem('champions-pvp.creator.v1');
+    } catch {
+      // Unlocked for this visit only.
+    }
+    return name;
   }
-  return true;
+  return null;
 }
 
-/** Forgets the unlock (for tests). */
+/** True when `text` is MissingNo.'s phrase (and unlocks it). */
+export async function tryCreatorCode(text) {
+  return (await tryUnlock(text)) === CREATOR_ID;
+}
+
+/** Forgets every unlock made this visit (for tests). */
 export function lockCreator() {
-  session = false;
-  checked = null;
+  session.clear();
+  checked.clear();
 }
 
 /** Does this team have MissingNo. in it? */

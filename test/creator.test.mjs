@@ -7,7 +7,7 @@ import {encodeTeam, decodeTeam} from '../src/engine/savecode.js';
 import {Match} from '../src/engine/match.js';
 import {sampleTeams} from '../src/engine/samples.js';
 import {canLearn, learnableMoveIds} from '../src/engine/learnsets.js';
-import {tryCreatorCode, creatorUnlocked, isCreatorSpecies, lockCreator, sha256} from '../src/engine/creator.js';
+import {tryCreatorCode, creatorUnlocked, isCreatorSpecies, lockCreator, sha256, tryUnlock, glitchedPowerUnlocked} from '../src/engine/creator.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
@@ -186,4 +186,53 @@ test('a team may have any number of MissingNo., but still only one of anything e
   m.choose(0, 'switch 3');
   m.choose(1, 'move 1');
   assert.equal(m.battle.p1.active[0].name, 'MissingNo. 3');
+});
+
+const GLITCH_PHRASE = '[secret phrase]';
+
+test('Glitched Power: its own phrase, only MissingNo. learns it, and it is locked until then', async () => {
+  const store = fakeStorage();
+  lockCreator();
+  try {
+    assert.ok(canLearn('MissingNo.', 'Glitched Power'));
+    assert.ok(!canLearn('Smeargle', 'Glitched Power') && !canLearn('Mew', 'Glitched Power'));
+    const team = teamWithMissingNo();
+    team.mons[0].moves[0] = 'Glitched Power';
+    assert.equal(await tryUnlock(PHRASE), 'missingno');
+    assert.equal(glitchedPowerUnlocked(), false);
+    assert.deepEqual(validateTeam(team).problems.map(p => p.text), ['Glitched Power is locked.']);
+    assert.ok(validateTeam(team, {creator: true}).ok, 'an opponent\'s team is still accepted');
+    // The MissingNo. phrase doesn't unlock it, and neither does a faked save.
+    store.set('champions-pvp.glitch.v1', '68a0e9fdf450ca3bfae44b363f4fa68b0079bcc1aa824f11e3cade8fab2ac036');
+    assert.equal(glitchedPowerUnlocked(), false);
+    assert.equal(await tryUnlock('[secret phrase]'), null);
+    assert.equal(await tryUnlock('[secret phrase]'), 'glitchedpower');
+    assert.equal(glitchedPowerUnlocked(), true);
+    lockCreator();
+    assert.equal(glitchedPowerUnlocked(), true, 'remembered in this browser');
+    assert.ok(validateTeam(team).ok);
+  } finally {
+    lockCreator();
+    delete globalThis.localStorage;
+  }
+  // Leave both unlocked for the battle test below.
+  assert.equal(await tryUnlock(PHRASE), 'missingno');
+  assert.equal(await tryUnlock(GLITCH_PHRASE), 'glitchedpower');
+});
+
+test('Glitched Power raises every stat, accuracy and evasion by 6, and has 1 PP', () => {
+  const team = teamWithMissingNo();
+  team.mons[0].moves[1] = 'Glitched Power';
+  const m = new Match({mode: 'singles', seed: '1,2,3,4', players: [{name: 'Me', team}, {name: 'Foe', team: sampleTeams()[2]}]});
+  m.choose(0, 'team 123456');
+  m.choose(1, 'team 123456');
+  const req = m.requests[0].active[0];
+  const slot = req.moves.find(x => x.id === 'glitchedpower');
+  assert.equal(slot.pp, 1);
+  assert.equal(slot.maxpp, 1);
+  m.choose(0, 'move 2');
+  m.choose(1, 'move 1');
+  const mn = m.battle.p1.active[0];
+  assert.deepEqual(mn.boosts, {atk: 6, def: 6, spa: 6, spd: 6, spe: 6, accuracy: 6, evasion: 6});
+  assert.ok(m.requests[0].active[0].moves.find(x => x.id === 'glitchedpower').disabled, 'out of PP');
 });

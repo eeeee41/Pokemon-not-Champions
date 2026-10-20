@@ -4,7 +4,7 @@ import {
   dex, toID, isSelectableSpecies, speciesAbilities, inGame, emptySP, clampSP, spLimit,
 } from './dex.js';
 import {canLearn} from './learnsets.js';
-import {isCreatorSpecies, creatorUnlocked} from './creator.js';
+import {isCreatorSpecies, creatorUnlocked, glitchedPowerUnlocked, GLITCHED_POWER} from './creator.js';
 import {
   STATS, STAT_LABELS, SP_TOTAL, SP_MAX, TEAM_SIZE, MAX_MOVES, LEVEL, IV, RULES, TERA_TYPES,
 } from './constants.js';
@@ -115,16 +115,19 @@ export function validateMon(mon) {
 
 /** {ok, problems: [{index, text}]} where index is the team slot or null for team-wide problems. */
 /**
- * Checks a team against the rules. MissingNo. is only allowed where it has been
- * unlocked; pass {creator: true} for an opponent's team, which was checked on
- * their side.
+ * Checks a team against the rules. MissingNo. and Glitched Power are only
+ * allowed where they have been unlocked; pass {creator: true} for an opponent's
+ * team, which was checked on their side.
  */
-export function validateTeam(team, {creator = creatorUnlocked()} = {}) {
+export function validateTeam(team, {creator = null} = {}) {
   const problems = [];
   const mons = team?.mons || [];
-  if (!creator) {
+  if (creator !== true) {
+    const ownCreator = creatorUnlocked();
+    const glitch = glitchedPowerUnlocked();
     mons.forEach((mon, index) => {
-      if (isCreatorSpecies(mon.species)) problems.push({index, text: 'This Pokémon is locked.'});
+      if (!ownCreator && isCreatorSpecies(mon.species)) problems.push({index, text: 'This Pokémon is locked.'});
+      if (!glitch && (mon.moves || []).some(m => toID(m) === GLITCHED_POWER)) problems.push({index, text: 'Glitched Power is locked.'});
     });
   }
   if (mons.length !== TEAM_SIZE) {

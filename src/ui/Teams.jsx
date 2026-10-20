@@ -6,7 +6,8 @@ import {encodeTeam, decodeTeam, findSaveCodes} from '../engine/savecode.js';
 import {TEAM_SIZE} from '../engine/constants.js';
 import {FitSprite} from './sprites.jsx';
 import {Sheet} from './pickers.jsx';
-import {creatorUnlocked, isCreatorSpecies} from '../engine/creator.js';
+import {creatorUnlocked, isCreatorSpecies, glitchedPowerUnlocked, GLITCHED_POWER} from '../engine/creator.js';
+import {toID} from '../engine/dex.js';
 
 export function TeamStrip({team, height = 52}) {
   const cells = [];
@@ -88,6 +89,18 @@ function ImportSheet({onImport, onClose}) {
     // Anything that isn't a save code is read as Showdown text.
     const rest = codes.reduce((t, c) => t.replace(c, ''), text);
     if (rest.trim()) teams.push(...importTeams(rest));
+    // Glitched Power only comes along where it has been unlocked.
+    if (!glitchedPowerUnlocked()) {
+      let dropped = 0;
+      for (const team of teams) {
+        for (const mon of team.mons) {
+          const moves = mon.moves.map(m => (toID(m) === GLITCHED_POWER ? '' : m));
+          dropped += moves.filter((m, i) => m !== mon.moves[i]).length;
+          mon.moves = moves;
+        }
+      }
+      if (dropped) note += ` Left out Glitched Power${dropped > 1 ? ` (${dropped} times)` : ''}: you haven't unlocked it.`;
+    }
     // MissingNo. only comes along where it has been unlocked.
     if (!creatorUnlocked()) {
       let left = 0;
@@ -96,7 +109,7 @@ function ImportSheet({onImport, onClose}) {
         left += team.mons.length - kept.length;
         team.mons = kept;
       }
-      if (left) note = ` Left out ${left} Pokémon you haven't unlocked.`;
+      if (left) note += ` Left out ${left} Pokémon you haven't unlocked.`;
       for (let i = teams.length - 1; i >= 0; i--) if (!teams[i].mons.length) teams.splice(i, 1);
       if (!teams.length && left) {
         setError("That team only has Pokémon you haven't unlocked.");
