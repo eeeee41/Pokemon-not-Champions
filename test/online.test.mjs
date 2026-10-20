@@ -368,9 +368,21 @@ test('a move the battle does not allow (a tampered page) ends it as a tie', asyn
   const gr = await open(rival, r, codes[2]);
   const random = rng(17);
   await play([ga, gr], random, {stop: () => ga.match && ga.match.battle.turn >= 2 && ga.match.needsChoice(ga.opp)});
-  // Rival's page is swapped for one that sends nonsense.
+  // Rival's page is swapped for one that sends nonsense. Its real page may
+  // already have answered this turn (choices can't be overwritten), so play on
+  // to the first turn it hasn't answered.
   gr.dispose();
-  await rival.b.set(`matches/${r.id}/choices/${r.side}/${ga.applied[ga.opp]}`, 'move 9, move 9');
+  const slot = () => `matches/${r.id}/choices/${r.side}/${ga.applied[ga.opp]}`;
+  await until(() => {
+    if (ga.phase.type === 'playback') {
+      ga.skipStage();
+      ga.advance();
+    }
+    if (ga.match.needsChoice(ga.opp) && server.value(slot()) == null) return true;
+    drive(ga, random);
+    return false;
+  }, 'a turn Rival has not answered');
+  await rival.b.set(slot(), 'move 9, move 9');
   await until(() => {
     if (ga.phase.type === 'playback') {
       ga.skipStage();
