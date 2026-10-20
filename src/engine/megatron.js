@@ -4,7 +4,7 @@
 // collects it; with all six, Megatron can be put on teams. Teams with him are
 // legal everywhere, online included, so other players' pages accept them.
 //
-//   Base stats 106 / 135 / 110 / 125 / 90 / 60 (BST 626).
+//   Base stats 416 / 405 / 350 / 383 / 306 / 240 (BST 2100).
 //   Ability Decepticon Leader: his Dark and Steel moves get 1.5x power at half
 //   HP or less, and allied Steel-types' Attack and Sp. Atk get 1.3x in Doubles.
 //   Signature moves Fusion Cannon and Peace Through Tyranny.
@@ -44,7 +44,7 @@ function install() {
     name: 'Megatron',
     types: ['Steel', 'Dark'],
     gender: 'N',
-    baseStats: {hp: 106, atk: 135, def: 110, spa: 125, spd: 90, spe: 60},
+    baseStats: {hp: 416, atk: 405, def: 350, spa: 383, spd: 306, spe: 240},
     abilities: {0: 'Decepticon Leader'},
     heightm: 8,
     weightkg: 999.9,

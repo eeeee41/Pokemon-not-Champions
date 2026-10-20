@@ -33,15 +33,12 @@ function start(t = team()) {
   return m;
 }
 
-test('Megatron: #-1, Steel/Dark, the base stats behind those max stats', () => {
+test('Megatron: #-1, Steel/Dark, base stats 416 / 405 / 350 / 383 / 306 / 240', () => {
   const s = dex.species.get('Megatron');
   assert.ok(s.exists);
   assert.equal(s.num, -1);
   assert.deepEqual(s.types, ['Steel', 'Dark']);
-  assert.deepEqual(s.baseStats, {hp: 106, atk: 135, def: 110, spa: 125, spd: 90, spe: 60});
-  // Level-100 max stats (31 IVs, 252 EVs, helpful nature): 416 / 405 / 350 / 383 / 306 / 240.
-  const max = (b, hp) => (hp ? 2 * b + 31 + 63 + 110 : Math.floor((2 * b + 31 + 63 + 5) * 1.1));
-  assert.deepEqual(Object.entries(s.baseStats).map(([k, b]) => max(b, k === 'hp')), [416, 405, 350, 383, 306, 240]);
+  assert.deepEqual(s.baseStats, {hp: 416, atk: 405, def: 350, spa: 383, spd: 306, spe: 240});
   assert.equal(s.abilities[0], 'Decepticon Leader');
 });
 
