@@ -249,3 +249,31 @@ test('every move MissingNo. knows fits in a save code and comes back', () => {
     assert.deepEqual(back.mons.map(m => m.moves), mons.map(m => m.moves), `moves ${i}–${i + 23}`);
   }
 });
+
+test('beating every rival on Champion unlocks MissingNo. (but not Glitched Power)', async () => {
+  const {RIVALS, beatEveryRival} = await import('../src/engine/rivals.js');
+  const {unlockByRivals} = await import('../src/engine/creator.js');
+  const all = Object.fromEntries(RIVALS.map(r => [r.id, ['normal', 'champion']]));
+  const missingOne = {...all, [RIVALS[5].id]: ['normal', 'hard']};
+  assert.equal(beatEveryRival(all), true);
+  assert.equal(beatEveryRival(missingOne), false);
+  assert.equal(beatEveryRival({}), false);
+  assert.equal(beatEveryRival(Object.fromEntries(RIVALS.map(r => [r.id, ['hard']]))), false);
+
+  const store = fakeStorage();
+  lockCreator();
+  try {
+    assert.equal(creatorUnlocked(), false);
+    unlockByRivals();
+    assert.equal(creatorUnlocked(), true);
+    lockCreator();
+    assert.equal(creatorUnlocked(), true, 'remembered in this browser');
+    assert.ok(validateTeam(teamWithMissingNo()).ok);
+    assert.equal(glitchedPowerUnlocked(), false);
+    store.clear();
+    assert.equal(creatorUnlocked(), false);
+  } finally {
+    lockCreator();
+    delete globalThis.localStorage;
+  }
+});

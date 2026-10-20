@@ -298,8 +298,30 @@ export function isUnlocked(name) {
   return checked.get(name).ok;
 }
 
+// The other way to get MissingNo.: beat every rival on Champion difficulty.
+const RIVALS_KEY = 'champions-pvp.creator.rivals.v1';
+const RIVALS_VALUE = 'beat every rival on champion';
+
+function unlockedByRivals() {
+  try {
+    return globalThis.localStorage?.getItem(RIVALS_KEY) === RIVALS_VALUE;
+  } catch {
+    return false;
+  }
+}
+
+/** Unlocks MissingNo. for beating every rival on Champion (and remembers it). */
+export function unlockByRivals() {
+  session.add(CREATOR_ID);
+  try {
+    globalThis.localStorage?.setItem(RIVALS_KEY, RIVALS_VALUE);
+  } catch {
+    // Unlocked for this visit only.
+  }
+}
+
 export function creatorUnlocked() {
-  return isUnlocked(CREATOR_ID);
+  return isUnlocked(CREATOR_ID) || unlockedByRivals();
 }
 
 export function glitchedPowerUnlocked() {

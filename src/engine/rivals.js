@@ -1368,6 +1368,11 @@ export function rivalTeams() {
   return built;
 }
 
+/** Has every rival been beaten on this difficulty? `wins` is {rivalId: [levels]}. */
+export function beatEveryRival(wins, level = 'champion') {
+  return RIVALS.every(r => wins?.[r.id]?.includes(level));
+}
+
 export function rivalById(id) {
   return RIVALS.find(r => r.id === id) || null;
 }

@@ -10,7 +10,8 @@ import {BattleScreen} from './Battle.jsx';
 import {OnlinePage, InviteBanner, onlineTeam} from './Online.jsx';
 import {RivalsPage} from './Rivals.jsx';
 import {BotGame} from './bot-game.js';
-import {rivalTeams} from '../engine/rivals.js';
+import {rivalTeams, beatEveryRival} from '../engine/rivals.js';
+import {creatorUnlocked, unlockByRivals} from '../engine/creator.js';
 import {LocalGame} from './local-game.js';
 import {OnlineSession} from './online-session.js';
 import {OnlineGame} from '../online/online-game.js';
@@ -55,6 +56,14 @@ export function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+  // Beating every rival on Champion unlocks MissingNo.
+  const [secret, setSecret] = useState(false);
+  useEffect(() => {
+    if (beatEveryRival(settings.rivalWins) && !creatorUnlocked()) {
+      unlockByRivals();
+      setSecret(true);
+    }
+  }, [settings.rivalWins]);
 
   const go = r => {
     setRoute(r);
@@ -235,6 +244,12 @@ export function App() {
         </div>
       </header>
       <main class="main">
+        {secret && (
+          <div class="card notice creator-notice secret-unlock" role="status">
+            <span>You beat every rival on Champion difficulty. <strong>MissingNo. is unlocked</strong>: search for it in the team builder.</span>
+            <button class="btn btn-sm" onClick={() => setSecret(false)}>Got it</button>
+          </div>
+        )}
         {banner && (
           <InviteBanner invite={banner} team={team} busy={online.busy}
             onAccept={() => session.accept(banner, team)}
