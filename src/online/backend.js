@@ -107,6 +107,17 @@ export class FirebaseBackend {
         reject(err);
       });
     });
+    // The database picks up a new sign-in a moment later; until it does, it
+    // refuses this player's own data. Wait for it (reading our own record).
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await get(ref(this.db, `users/${user.uid}`));
+        break;
+      } catch (err) {
+        if (attempt >= 6 || !/permission/i.test(`${err?.code} ${err?.message}`)) throw err;
+        await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+      }
+    }
     this.uid = user.uid;
     return this.uid;
   }
