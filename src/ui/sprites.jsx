@@ -10,7 +10,7 @@ export const ASSET_BASE = 'assets/';
 
 // The one-file offline copy carries its sprite sheets inside the page and hands
 // them over as blob URLs; the hosted site loads them from assets/.
-function assetUrl(file) {
+export function assetUrl(file) {
   const offline = typeof window !== 'undefined' && window.CHAMPIONS_ASSETS;
   return (offline && offline[file]) || ASSET_BASE + file;
 }

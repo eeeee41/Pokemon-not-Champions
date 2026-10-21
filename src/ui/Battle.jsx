@@ -5,6 +5,8 @@ import {targetOptions} from '../engine/choices.js';
 import {MODES, STAT_LABELS} from '../engine/constants.js';
 import {FitSprite, Sprite, TypeBadge, ShinyMark, spriteStyle, detailsShiny} from './sprites.jsx';
 import {clock, useTicker} from './Online.jsx';
+import {FxScene} from './fx/scene.js';
+import {animFor} from './fx/triggers.js';
 
 // ---------- helpers ----------
 
@@ -86,7 +88,7 @@ function useElementWidth(ref) {
 const SPARKS = [[12, 22, 0], [86, 14, 110], [52, -4, 220], [96, 58, 330], [4, 66, 160], [64, 42, 270], [32, 88, 390], [78, 84, 60]];
 const FX_FRESH_MS = 1200;
 
-function FieldMon({pokemon, tracker, own, pos, unit, fx}) {
+function FieldMon({pokemon, tracker, own, pos, unit, fx, slot}) {
   const [anim, setAnim] = useState('');
   const [sparkle, setSparkle] = useState(0);
   useEffect(() => {
@@ -108,7 +110,7 @@ function FieldMon({pokemon, tracker, own, pos, unit, fx}) {
   const tera = pokemon.terastallized;
   const classes = ['mon-body', anim, pokemon.fainted ? 'fainted' : '', dynamax ? 'dynamax' : ''].filter(Boolean).join(' ');
   return (
-    <div class={`mon ${own ? 'own' : 'foe'}`} style={{left: `${pos.x}%`, top: `${pos.y}%`}}>
+    <div class={`mon ${own ? 'own' : 'foe'}`} data-slot={slot} style={{left: `${pos.x}%`, top: `${pos.y}%`}}>
       <div class={classes}>
         <Sprite name={name} back={own} shiny={shiny} scale={scale} />
         {tera && <span class={`tera-crystal t-${toID(tera)}`} style={spriteStyle(name, own, scale, true, shiny)} />}
@@ -160,8 +162,19 @@ function sideTags(side) {
   return Object.values(side.sideConditions || {}).map(c => (c.level > 1 ? `${c.name} ×${c.level}` : c.name));
 }
 
-export function Stadium({tracker, perspective, mode, exactOwn, fx = {}, message}) {
+export function Stadium({tracker, perspective, mode, exactOwn, fx = {}, message, fxRef}) {
   const ref = useRef(null);
+  const fxHost = useRef(null);
+  // Move animations play in this layer (see fx/scene.js).
+  useEffect(() => {
+    if (!fxRef || !fxHost.current) return undefined;
+    const scene = new FxScene(fxHost.current, {activeCount: MODES[mode].active, perspective});
+    fxRef.current = scene;
+    return () => {
+      scene.destroy();
+      if (fxRef.current === scene) fxRef.current = null;
+    };
+  }, [mode, perspective, fxRef]);
   const width = useElementWidth(ref);
   const compact = width < 560;
   const unit = Math.max(0.55, Math.min(1.35, width / 640));
@@ -211,10 +224,11 @@ export function Stadium({tracker, perspective, mode, exactOwn, fx = {}, message}
         {sideTags(foe).length > 0 && <div class="side-tags foe">{sideTags(foe).map(t => <span key={t} class="field-tag">{t}</span>)}</div>}
         {sideTags(own).length > 0 && <div class="side-tags own">{sideTags(own).map(t => <span key={t} class="field-tag">{t}</span>)}</div>}
         {foeActive.map((p, i) => p && (
-          <FieldMon key={`f${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own={false} pos={pos.foe[i]} unit={unit} fx={fx[`p${foe.n + 1}${'abc'[i]}`]} />
+          <FieldMon key={`f${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own={false} pos={pos.foe[i]} unit={unit} fx={fx[`p${foe.n + 1}${'abc'[i]}`]} slot={`p${foe.n + 1}${'abc'[i]}`} />
         ))}
+        <div class="fx-host" ref={fxHost} aria-hidden="true" />
         {ownActive.map((p, i) => p && (
-          <FieldMon key={`o${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own pos={pos.own[i]} unit={unit} fx={fx[`p${own.n + 1}${'abc'[i]}`]} />
+          <FieldMon key={`o${i}-${p.originalIdent}`} pokemon={p} tracker={tracker} own pos={pos.own[i]} unit={unit} fx={fx[`p${own.n + 1}${'abc'[i]}`]} slot={`p${own.n + 1}${'abc'[i]}`} />
         ))}
         {!compact && foeBoxes.map(({p, i}, k) => (
           <InfoBox key={`fi${i}`} pokemon={p} exact={false} style={{left: '10px', top: `${10 + k * 64}px`}} />
@@ -659,13 +673,30 @@ function OnlineResult({game, names, turn, phase, rematch, onRematch, onAcceptRem
   );
 }
 
-export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematch, rematch, onAcceptRematch, onDeclineRematch, onCancelRematch}) {
+/** The Pokémon on the stage's field, for the animations: [{slot, side, index, shiny}]. */
+function fieldOf(battle) {
+  const out = [];
+  for (const side of [battle.p1, battle.p2]) {
+    side.active.forEach((p, i) => {
+      const id = `p${side.n + 1}`;
+      if (p && !p.fainted) out.push({slot: `${id}${'abc'[i]}`, side: id, index: i, shiny: !!p.shiny});
+    });
+  }
+  return out;
+}
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+export function BattleScreen({game, speed = 'normal', onSpeed, effects = true, onEffects, onLeave, onRematch, rematch, onAcceptRematch, onDeclineRematch, onCancelRematch}) {
   const [, force] = useReducer(x => x + 1, 0);
   const [fx, setFx] = useState({});
+  const fxRef = useRef(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmForfeit, setConfirmForfeit] = useState(false);
   useEffect(() => game.subscribe(force), [game]);
   const phase = game.phase;
+  const effectsOn = effects !== false;
   // Online clocks count down once a second.
   useTicker(!!game.online && (phase.type === 'choose' || phase.type === 'waiting'));
 
@@ -676,7 +707,9 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
     const tick = () => {
       if (cancelled) return;
       let wait = 0;
+      let anim = null;
       const effects = {};
+      const animate = effectsOn && fxRef.current && !reducedMotion();
       while (!wait) {
         const r = game.stepStage();
         if (!r) {
@@ -684,6 +717,7 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
           return;
         }
         const cmd = r.args[0];
+        if (animate) anim = animFor(r, fieldOf(game.stage.battle)) || anim;
         if (FX[cmd] && typeof r.args[1] === 'string') {
           effects[r.args[1].slice(0, 3)] = {type: FX[cmd], n: Math.random(), at: performance.now()};
         }
@@ -699,14 +733,30 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
       }
       if (Object.keys(effects).length) setFx(prev => ({...prev, ...effects}));
       force();
-      timer = setTimeout(tick, wait * (SPEEDS[speed] || 1));
+      const pace = SPEEDS[speed] || 1;
+      if (anim && fxRef.current) {
+        // Let the screen catch up with this line, play its animation, then go on.
+        const scene = fxRef.current;
+        scene.timeScale = pace;
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          const played = scene.play(anim.kind, anim.id, fieldOf(game.stage.battle), anim.slots);
+          // Never hang on an animation; and leave the line on screen long enough to read.
+          Promise.all([Promise.race([played, sleep(6000 * pace)]), sleep(Math.min(wait, 500) * pace)]).then(() => {
+            if (!cancelled) timer = setTimeout(tick, 120 * pace);
+          });
+        }, 30);
+        return;
+      }
+      timer = setTimeout(tick, wait * pace);
     };
     timer = setTimeout(tick, 200);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      fxRef.current?.stop();
     };
-  }, [phase, game, speed]);
+  }, [phase, game, speed, effectsOn]);
 
   const online = !!game.online;
   // An online battle knows its players' names before their teams arrive.
@@ -732,7 +782,7 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
     const started = game.stage.battle.turn > 0 || game.stage.battle.p1.active.some(Boolean);
     // Online, the stage replays the battle as this player sees it (their own HP exact).
     stadium = started ? (
-      <Stadium tracker={game.stage} perspective={game.stagePerspective || 'p1'} mode={mode} exactOwn={online || !!game.bot} fx={fx}
+      <Stadium tracker={game.stage} perspective={game.stagePerspective || 'p1'} mode={mode} exactOwn={online || !!game.bot} fx={fx} fxRef={fxRef}
         message={phase.type === 'playback' ? game.lastText : ''} />
     ) : null;
     if (phase.type === 'thinking') {
@@ -821,7 +871,11 @@ export function BattleScreen({game, speed = 'normal', onSpeed, onLeave, onRematc
                 <button key={s} aria-pressed={speed === s} onClick={() => onSpeed?.(s)}>{s[0].toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
+            <button class="btn btn-sm btn-ghost" aria-pressed={effectsOn} title="Move animations" onClick={() => onEffects?.(!effectsOn)}>
+              {effectsOn ? 'Animations on' : 'Animations off'}
+            </button>
             <button class="btn btn-sm" onClick={() => {
+              fxRef.current?.stop();
               game.skipStage();
               game.advance();
             }}>Skip</button>

@@ -48,18 +48,26 @@ function copyAssets() {
 function writeOffline(head, css) {
   const js = fs.readFileSync(path.join(dist, 'app.js'), 'utf8');
   if (js.includes('</script')) throw new Error('app.js contains </script; it cannot be inlined');
+  // Sprite sheets, plus the move-animation images (in sub-folders).
+  const TYPES = {webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif'};
   const assets = {};
-  for (const file of fs.readdirSync(path.join(dist, 'assets'))) {
-    if (file.endsWith('.webp')) assets[file] = fs.readFileSync(path.join(dist, 'assets', file)).toString('base64');
-  }
+  const walk = dir => {
+    for (const entry of fs.readdirSync(path.join(dist, 'assets', dir), {withFileTypes: true})) {
+      const rel = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(rel);
+      else if (TYPES[entry.name.split('.').pop()]) assets[rel] = fs.readFileSync(path.join(dist, 'assets', rel)).toString('base64');
+    }
+  };
+  walk('');
   const loader = `(function () {
   var data = ${JSON.stringify(assets)};
+  var types = ${JSON.stringify(TYPES)};
   var urls = {};
   for (var name in data) {
     var bin = atob(data[name]);
     var bytes = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    urls[name] = URL.createObjectURL(new Blob([bytes], {type: 'image/webp'}));
+    urls[name] = URL.createObjectURL(new Blob([bytes], {type: types[name.split('.').pop()]}));
   }
   window.CHAMPIONS_ASSETS = urls;
 })();`;

@@ -545,6 +545,36 @@ a { color: var(--gold-ink); }
 .platform { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); z-index: 1;
   background: radial-gradient(closest-side, rgba(255, 255, 255, .35), rgba(255, 255, 255, .12) 60%, transparent 100%); }
 .mon { position: absolute; z-index: 2; transform: translate(-50%, -100%); }
+/* Move animations (fx/scene.js): copies of the Pokémon and the effects play here. */
+.fx-host { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.fx-host > div { position: absolute; inset: 0; }
+.arena > .arena-stands, .arena > .arena-lights, .arena > .arena-court, .arena > .arena-overlay, .arena > .platform { translate: 0 var(--fx-shake, 0px); }
+.fx-bg .fx-background { position: absolute; inset: 0; }
+.fx-mon { position: absolute; image-rendering: pixelated; }
+.fx-effects img { pointer-events: none; }
+.fx-effects img.pixelated { image-rendering: pixelated; }
+.mon.fx-hidden .mon-body > .sprite, .mon.fx-hidden .tera-crystal { visibility: hidden; }
+.fx-flash { position: absolute; inset: 0; pointer-events: none; }
+.fx-glitch-overlay {
+  position: absolute; inset: 0; display: none; pointer-events: none; mix-blend-mode: screen;
+  background-size: 100% 100%, 160px 160px; background-repeat: no-repeat, repeat;
+  animation: fx-tear .16s steps(2) infinite;
+}
+@keyframes fx-tear {
+  0% { background-position: 0 0, 0 0; translate: -8px 0; }
+  33% { background-position: 0 41px, 57px 23px; translate: 6px 0; }
+  66% { background-position: 0 -67px, -41px 83px; translate: -3px 0; }
+  100% { background-position: 0 19px, 13px -29px; translate: 4px 0; }
+}
+.arena.fx-glitching > .arena-stands, .arena.fx-glitching > .arena-court, .arena.fx-glitching > .platform, .arena.fx-glitching > .arena-lights { animation: fx-jitter .13s steps(2) infinite; }
+.arena.fx-glitching .fx-mon { animation: fx-rgb .1s steps(2) infinite; }
+.arena.fx-glitching-hard { animation: fx-hue .22s steps(3) infinite; }
+@keyframes fx-jitter { 0% { translate: -5px var(--fx-shake, 0px); } 50% { translate: 7px var(--fx-shake, 0px); } 100% { translate: -2px var(--fx-shake, 0px); } }
+@keyframes fx-rgb {
+  0% { filter: drop-shadow(4px 0 rgba(255, 70, 196, .9)) drop-shadow(-4px 0 rgba(120, 236, 255, .9)); translate: -3px 0; }
+  100% { filter: drop-shadow(-5px 0 rgba(255, 70, 196, .9)) drop-shadow(5px 0 rgba(120, 236, 255, .9)); translate: 3px 0; }
+}
+@keyframes fx-hue { 0% { filter: none; } 50% { filter: hue-rotate(150deg) saturate(1.7) contrast(1.2); } 100% { filter: invert(.15) hue-rotate(-60deg); } }
 .mon.foe { z-index: 1; }
 .mon-body { position: relative; transform-origin: 50% 100%; transition: opacity .4s, transform .45s cubic-bezier(.2, .8, .2, 1), filter .3s; }
 .mon-body.enter { animation: enter .5s cubic-bezier(.2, .8, .2, 1); }

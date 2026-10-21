@@ -114,8 +114,13 @@ In the Firebase project: register a web app with Hosting, enable Anonymous sign-
 Realtime Database. The site reads its Firebase settings from Hosting's `/__/firebase/init.json`, so
 nothing needs to be pasted into the code.
 
-## Credits
+## Credits and licence
 
 A fan project, not affiliated with Nintendo, Game Freak, Creatures or The Pokémon Company.
-Battle engine: Pokémon Showdown (MIT), via the pkmn packages (MIT). Sprites: Smogon's sprite
-project. Pokémon and all related names are trademarks of their owners.
+Battle engine: Pokémon Showdown (MIT), via the pkmn packages (MIT). Move animations: Pokémon
+Showdown's (MIT / CC0, with their effect images), in `vendor/showdown/`; the site's own moves have
+original effects. Sprites: Smogon's sprite project. Pokémon and all related names are trademarks
+of their owners.
+
+This project is licensed under the GNU AGPL v3.0 (`LICENSE`). Details and credits for everything
+it includes: `THIRD-PARTY-NOTICES.md`.

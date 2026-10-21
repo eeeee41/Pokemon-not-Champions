@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS = {
   mode: 'singles',
   hideChoices: true,
   speed: 'normal',
+  effects: true, // move animations
   onlineName: '',
   onlineMode: 'singles',
   onlineTeam: null,

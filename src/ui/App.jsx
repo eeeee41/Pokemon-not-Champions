@@ -167,6 +167,8 @@ export function App() {
         game={game}
         speed={settings.speed}
         onSpeed={speed => setSettings({...settings, speed})}
+        effects={settings.effects !== false}
+        onEffects={on => setSettings({...settings, effects: on})}
         onLeave={() => {
           const back = game.online ? 'online' : game.bot ? 'rivals' : 'setup';
           if (game.bot) game.dispose();
@@ -263,7 +265,8 @@ export function App() {
       </main>
       <footer class="footer">
         <div class="footer-inner">
-          A fan project. Battle engine: Pokémon Showdown (MIT). Sprites: Smogon's sprite project. Pokémon © Nintendo, Game Freak and Creatures.
+          A fan project. Battle engine and move animations: Pokémon Showdown. Sprites: Smogon's sprite project. Pokémon © Nintendo, Game Freak and Creatures.{' '}
+          <a href="https://github.com/eeeee41/Pokemon-not-Champions" target="_blank" rel="noopener">Source code</a> (AGPL-3.0).
         </div>
       </footer>
     </div>
